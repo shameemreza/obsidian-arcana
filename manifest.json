@@ -1,0 +1,9 @@
+{
+	"id": "obsidian-arcana",
+	"name": "Arcana",
+	"version": "1.0.0",
+	"minAppVersion": "1.7.0",
+	"description": "Combine AI chat, tasks, voice, and smart organization with science-backed productivity features like ADHD support, focus timers, and chronotype scheduling.",
+	"author": "Shameem",
+	"isDesktopOnly": false
+}

@@ -1,0 +1,196 @@
+import type { TaskFrontmatter, TaskPriority, TaskStatus } from "../../types";
+import { parseNaturalDate, todayISO } from "../../utils/dates";
+import type { AIEngine } from "../ai/ai-engine";
+
+/**
+ * Parses natural language text into structured task properties.
+ * Uses a combination of regex-based heuristics and optional AI extraction.
+ */
+export class TaskParser {
+	constructor(private aiEngine: AIEngine) {}
+
+	/**
+	 * Parse a natural language string into task frontmatter.
+	 * Example: "Review vendor submission by Friday #work priority:high"
+	 */
+	parse(input: string): TaskFrontmatter {
+		let text = input.trim();
+
+		const tags = extractTags(text);
+		text = removeTags(text);
+
+		const priority = extractPriority(text);
+		text = removePriorityMarkers(text);
+
+		const due = extractDueDate(text);
+		text = removeDatePhrases(text);
+
+		const title = text.replace(/\s+/g, " ").trim();
+
+		return {
+			title: title || "Untitled task",
+			status: "inbox" as TaskStatus,
+			priority,
+			created: todayISO(),
+			...(due ? { due } : {}),
+			...(tags.length > 0 ? { tags } : {}),
+		};
+	}
+
+	/**
+	 * Use AI to extract richer task properties from natural language.
+	 * Falls back to heuristic parsing if AI is unavailable.
+	 */
+	async parseWithAI(input: string): Promise<TaskFrontmatter> {
+		const provider = this.aiEngine.getActiveProvider();
+		if (!provider.isConfigured()) {
+			return this.parse(input);
+		}
+
+		const prompt = [
+			"Extract task properties from this text. Respond with ONLY valid JSON, no markdown:",
+			'"""',
+			input,
+			'"""',
+			"",
+			"JSON format:",
+			'{',
+			'  "title": "clear task title",',
+			'  "due": "YYYY-MM-DD or null",',
+			'  "priority": "urgent|high|medium|low|none",',
+			'  "tags": ["tag1", "tag2"],',
+			'  "context": "project or area name, or null",',
+			'  "time_estimate": minutes as number or null',
+			'}',
+		].join("\n");
+
+		try {
+			const response = await this.aiEngine.chatComplete(
+				[{ role: "user", content: prompt, timestamp: Date.now() }],
+				{ temperature: 0.1, maxTokens: 200 },
+			);
+
+			const json = extractJSON(response);
+			if (!json) return this.parse(input);
+
+			return {
+				title: typeof json.title === "string" ? json.title : input,
+				status: "inbox" as TaskStatus,
+				priority: validPriority(json.priority) ?? "medium",
+				created: todayISO(),
+				...(typeof json.due === "string" ? { due: json.due } : {}),
+				...(Array.isArray(json.tags) && json.tags.length > 0
+					? { tags: json.tags.filter((t: unknown) => typeof t === "string") }
+					: {}),
+				...(typeof json.context === "string"
+					? { context: json.context }
+					: {}),
+				...(typeof json.time_estimate === "number"
+					? { time_estimate: json.time_estimate }
+					: {}),
+			};
+		} catch {
+			return this.parse(input);
+		}
+	}
+}
+
+// --- Extraction Helpers ---
+
+function extractTags(text: string): string[] {
+	const matches = text.match(/#[\w-]+/g);
+	if (!matches) return [];
+	return [...new Set(matches.map((t) => t.replace(/^#/, "")))];
+}
+
+function removeTags(text: string): string {
+	return text.replace(/#[\w-]+/g, "").trim();
+}
+
+const PRIORITY_MAP: Record<string, TaskPriority> = {
+	urgent: "urgent",
+	"!!!!": "urgent",
+	"!!!": "high",
+	high: "high",
+	"!!": "medium",
+	medium: "medium",
+	"!": "low",
+	low: "low",
+	none: "none",
+};
+
+function extractPriority(text: string): TaskPriority {
+	const explicit = text.match(
+		/priority:\s*(urgent|high|medium|low|none)/i,
+	);
+	if (explicit) return PRIORITY_MAP[explicit[1].toLowerCase()] ?? "medium";
+
+	const bangMatch = text.match(/(!{1,4})(?:\s|$)/);
+	if (bangMatch) return PRIORITY_MAP[bangMatch[1]] ?? "medium";
+
+	if (/\b(asap|critical|urgent)\b/i.test(text)) return "urgent";
+	if (/\b(important|high\s*pri)\b/i.test(text)) return "high";
+
+	return "medium";
+}
+
+function removePriorityMarkers(text: string): string {
+	return text
+		.replace(/priority:\s*(urgent|high|medium|low|none)/gi, "")
+		.replace(/!{1,4}(?:\s|$)/g, " ")
+		.replace(/\b(asap|critical)\b/gi, "")
+		.trim();
+}
+
+const DATE_PHRASES = [
+	/\bby\s+(.+?)(?:\s*$|\s+#|\s+priority:)/i,
+	/\bdue\s+(.+?)(?:\s*$|\s+#|\s+priority:)/i,
+	/\bbefore\s+(.+?)(?:\s*$|\s+#|\s+priority:)/i,
+	/\bon\s+(.+?)(?:\s*$|\s+#|\s+priority:)/i,
+];
+
+function extractDueDate(text: string): string | undefined {
+	for (const pattern of DATE_PHRASES) {
+		const match = text.match(pattern);
+		if (match) {
+			const parsed = parseNaturalDate(match[1].trim());
+			if (parsed) return parsed;
+		}
+	}
+	return undefined;
+}
+
+function removeDatePhrases(text: string): string {
+	let result = text;
+	for (const pattern of DATE_PHRASES) {
+		result = result.replace(pattern, " ");
+	}
+	return result.trim();
+}
+
+function extractJSON(
+	text: string,
+): Record<string, unknown> | null {
+	const match = text.match(/\{[\s\S]*\}/);
+	if (!match) return null;
+	try {
+		return JSON.parse(match[0]) as Record<string, unknown>;
+	} catch {
+		return null;
+	}
+}
+
+const VALID_PRIORITIES = new Set([
+	"urgent",
+	"high",
+	"medium",
+	"low",
+	"none",
+]);
+
+function validPriority(value: unknown): TaskPriority | null {
+	if (typeof value === "string" && VALID_PRIORITIES.has(value)) {
+		return value as TaskPriority;
+	}
+	return null;
+}

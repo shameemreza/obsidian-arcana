@@ -1,0 +1,35 @@
+{
+	"name": "obsidian-arcana",
+	"version": "1.0.0",
+	"description": "Combine AI chat, tasks, voice, and smart organization with science-backed productivity features like ADHD support, focus timers, and chronotype scheduling.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"lint": "eslint src/",
+		"lint:fix": "eslint src/ --fix",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"ai",
+		"productivity",
+		"tasks"
+	],
+	"author": "Shameem",
+	"license": "MIT",
+	"pnpm": {
+		"onlyBuiltDependencies": ["esbuild"]
+	},
+	"devDependencies": {
+		"@typescript-eslint/eslint-plugin": "^8.0.0",
+		"@typescript-eslint/parser": "^8.0.0",
+		"builtin-modules": "^4.0.0",
+		"esbuild": "^0.24.0",
+		"eslint": "^8.57.0",
+		"obsidian": "latest",
+		"tslib": "^2.7.0",
+		"typescript": "^5.6.0"
+	}
+}
