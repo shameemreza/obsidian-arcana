@@ -5,10 +5,13 @@ import { AIEngine } from "./core/ai/ai-engine";
 import { VaultIntel } from "./core/vault/vault-intel";
 import { NoteCreator } from "./core/vault/note-creator";
 import { TaskParser } from "./core/vault/task-parser";
+import { TaskScanner } from "./core/vault/task-scanner";
 import { ChatHistory } from "./core/chat-history";
 import { SkillLoader } from "./core/commands/skill-loader";
 import { SkillRunner } from "./core/commands/skill-runner";
 import { ChatView } from "./ui/chat/ChatView";
+import { TaskModal } from "./ui/tasks/TaskModal";
+import { QuickTaskModal } from "./ui/tasks/QuickTaskModal";
 import { VIEW_TYPE_CHAT, DEFAULT_COMMANDS_PATH } from "./constants";
 import {
 	registerCommands,
@@ -23,6 +26,7 @@ export default class ArcanaPlugin extends Plugin {
 	vaultIntel!: VaultIntel;
 	noteCreator!: NoteCreator;
 	taskParser!: TaskParser;
+	taskScanner!: TaskScanner;
 	chatHistory!: ChatHistory;
 	skillLoader!: SkillLoader;
 	skillRunner!: SkillRunner;
@@ -34,6 +38,7 @@ export default class ArcanaPlugin extends Plugin {
 		this.vaultIntel = new VaultIntel(this.app, this.aiEngine);
 		this.noteCreator = new NoteCreator(this.app, this.vaultIntel);
 		this.taskParser = new TaskParser(this.aiEngine);
+		this.taskScanner = new TaskScanner(this.app, () => this.settings);
 		this.chatHistory = new ChatHistory(
 			this.app,
 			() => this.settings,
@@ -59,6 +64,18 @@ export default class ArcanaPlugin extends Plugin {
 			id: "toggle-chat",
 			name: "Toggle chat panel",
 			callback: () => this.toggleChat(),
+		});
+
+		this.addCommand({
+			id: "new-task",
+			name: "New task",
+			callback: () => this.openTaskModal(),
+		});
+
+		this.addCommand({
+			id: "quick-task",
+			name: "Quick task",
+			callback: () => this.openQuickTask(),
 		});
 
 		this.addSettingTab(new ArcanaSettingTab(this.app, this));
@@ -108,7 +125,10 @@ export default class ArcanaPlugin extends Plugin {
 	}
 
 	private registerVaultEvents(): void {
-		const invalidate = () => this.vaultIntel.invalidate();
+		const invalidate = () => {
+			this.vaultIntel.invalidate();
+			this.taskScanner.invalidate();
+		};
 
 		this.registerEvent(this.app.vault.on("create", invalidate));
 		this.registerEvent(this.app.vault.on("delete", invalidate));
@@ -149,6 +169,26 @@ export default class ArcanaPlugin extends Plugin {
 				}
 			}),
 		);
+	}
+
+	private openTaskModal(): void {
+		new TaskModal(this.app, {
+			noteCreator: this.noteCreator,
+			taskFolder: this.settings.taskFolderPath,
+			defaultStatus: this.settings.defaultTaskStatus,
+			defaultPriority: this.settings.defaultTaskPriority,
+		}).open();
+	}
+
+	private openQuickTask(): void {
+		new QuickTaskModal(this.app, {
+			taskParser: this.taskParser,
+			noteCreator: this.noteCreator,
+			taskFolder: this.settings.taskFolderPath,
+			defaultStatus: this.settings.defaultTaskStatus,
+			defaultPriority: this.settings.defaultTaskPriority,
+			useAI: this.aiEngine.getActiveProvider().isConfigured(),
+		}).open();
 	}
 
 	private async toggleChat(): Promise<void> {

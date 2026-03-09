@@ -2,9 +2,9 @@
  * Vault-only tool implementations for custom commands.
  * These execute during the agent loop when the AI calls a tool.
  *
- * source: vault  — keyword search across the vault
- * source: note   — read a specific note by name
- * source: folder — read all notes in a folder
+ * source: vault  - keyword search across the vault
+ * source: note   - read a specific note by name
+ * source: folder - read all notes in a folder
  */
 
 import { type App, type TFile, TFolder } from "obsidian";
@@ -178,6 +178,6 @@ async function readFolder(
 
 	return {
 		name: call.name,
-		content: `Folder "${folderPath}" — ${mdFiles.length} note(s):\n\n${parts.join("\n\n---\n\n")}`,
+		content: `Folder "${folderPath}" - ${mdFiles.length} note(s):\n\n${parts.join("\n\n---\n\n")}`,
 	};
 }

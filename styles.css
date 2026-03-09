@@ -652,6 +652,83 @@
 }
 
 /* ============================================================
+   Task Modal
+   ============================================================ */
+
+.arcana-task-modal {
+	max-width: 520px;
+}
+
+.arcana-task-modal h2 {
+	margin-top: 0;
+	margin-bottom: var(--size-4-3);
+}
+
+.arcana-date-hint {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	margin-top: var(--size-2-1);
+	min-height: 1.2em;
+}
+
+.arcana-date-hint-error {
+	color: var(--text-error);
+}
+
+.arcana-task-notes-field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+	margin-bottom: var(--size-4-3);
+	padding: 0 var(--size-4-3);
+}
+
+.arcana-task-notes-label {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-medium);
+	color: var(--text-normal);
+}
+
+.arcana-task-notes-input {
+	resize: vertical;
+	min-height: 80px;
+	max-height: 200px;
+	width: 100%;
+}
+
+/* ============================================================
+   Quick Task Modal
+   ============================================================ */
+
+.arcana-quick-task-modal {
+	max-width: 440px;
+}
+
+.arcana-quick-task-modal h3 {
+	margin-top: 0;
+	margin-bottom: var(--size-4-1);
+}
+
+.arcana-quick-task-hint {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-bottom: var(--size-4-3);
+}
+
+.arcana-quick-task-input {
+	width: 100%;
+	padding: var(--size-4-2) var(--size-4-3);
+	margin-bottom: var(--size-4-3);
+	font-size: var(--font-ui-medium);
+}
+
+.arcana-quick-task-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--size-4-2);
+}
+
+/* ============================================================
    Settings — Custom Commands List
    ============================================================ */
 

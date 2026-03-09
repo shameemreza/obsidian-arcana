@@ -90,16 +90,16 @@ export function formatContextForPrompt(
 	if (!ctx.content) return basePrompt;
 
 	const mentionNote = ctx.mentionedNotes.length > 0
-		? `The user referenced ${ctx.mentionedNotes.length} note(s) with @[[name]] syntax. Their full contents are included below — use them to answer.`
+		? `The user referenced ${ctx.mentionedNotes.length} note(s) with @[[name]] syntax. Their full contents are included below. Use them to answer.`
 		: "";
 
 	const instructions = [
 		"VAULT CONTEXT",
 		"",
-		`You have access to the user's vault content below (${ctx.mode} mode — ${ctx.label}).`,
+		`You have access to the user's vault content below (${ctx.mode} mode, ${ctx.label}).`,
 		"This is live content from their Obsidian vault that has been loaded for you.",
 		"Reference this content directly when answering. Quote or summarize from it as needed.",
-		"Do NOT tell the user you cannot see their notes — you can. The content is right here.",
+		"Do NOT tell the user you cannot see their notes. You can. The content is right here.",
 		mentionNote,
 	].filter(Boolean).join("\n");
 
@@ -186,7 +186,7 @@ async function buildVaultContext(
 		return buildRecentNotesContext(app, files, maxTokens);
 	}
 
-	const parts: string[] = [`## Vault search — ${relevant.length} relevant notes\n`];
+	const parts: string[] = [`## Vault search - ${relevant.length} relevant notes\n`];
 	let tokens = estimateTokens(parts[0]);
 
 	for (const { file, score } of relevant) {
@@ -364,7 +364,7 @@ async function scoreFiles(
 /**
  * Get the active file from the workspace. Uses workspace.getActiveFile()
  * which returns the last-focused file even when the sidebar (chat panel)
- * has focus — unlike getActiveViewOfType(MarkdownView) which returns null
+ * has focus, unlike getActiveViewOfType(MarkdownView) which returns null
  * when a non-editor view is active.
  */
 function getActiveFile(app: App): TFile | null {
@@ -373,7 +373,7 @@ function getActiveFile(app: App): TFile | null {
 
 /**
  * Compute a quick token estimate for the current context mode
- * without reading full file contents — used for the UI counter.
+ * without reading full file contents. Used for the UI counter.
  */
 export async function estimateContextTokens(
 	app: App,

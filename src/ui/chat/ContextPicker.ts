@@ -149,7 +149,7 @@ export class ContextPicker {
 					const count = folder.children.filter(
 						(f) => "extension" in f && (f as { extension: string }).extension === "md",
 					).length;
-					label = `${folder.name || "Root"} — ${count} note${count !== 1 ? "s" : ""}`;
+					label = `${folder.name || "Root"} - ${count} note${count !== 1 ? "s" : ""}`;
 				} else {
 					label = "No folder open";
 				}

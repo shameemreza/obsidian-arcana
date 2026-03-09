@@ -37,7 +37,7 @@ export const summarizeCommand: SlashCommand = {
 			if (!content.trim()) {
 				ctx.finalizeStreaming(
 					ctx.addAssistantMessage(""),
-					`**${file.basename}** is empty — nothing to summarize.`,
+					`**${file.basename}** is empty, nothing to summarize.`,
 				);
 				return;
 			}

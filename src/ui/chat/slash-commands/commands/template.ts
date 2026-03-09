@@ -60,8 +60,8 @@ export const templateCommand: SlashCommand = {
 
 			const titleMatch = ctx.args.match(/^(.+?)(?:\s+for\s+|\s+template\s*$|\s*$)/i);
 			const title = titleMatch
-				? `Template — ${titleMatch[1].trim()}`
-				: `Template — ${ctx.args.slice(0, 50)}`;
+				? `Template - ${titleMatch[1].trim()}`
+				: `Template - ${ctx.args.slice(0, 50)}`;
 
 			const templateContent = full.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
 

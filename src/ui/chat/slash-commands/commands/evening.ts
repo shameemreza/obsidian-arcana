@@ -165,7 +165,7 @@ async function saveToDailyNote(
 		}
 
 		const content = buildNoteContent(
-			{ title: `Daily Note — ${today}`, date: today },
+			{ title: `Daily Note - ${today}`, date: today },
 			reviewSection,
 		);
 		await app.vault.create(dailyPath, content);

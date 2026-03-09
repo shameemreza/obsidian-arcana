@@ -133,7 +133,7 @@ async function sendCheckIn(
 			`Elapsed: ${elapsed} minutes. Remaining: ${remaining} minutes.`,
 			"",
 			"Send a brief, friendly check-in. Ask how it's going or if they need help.",
-			"Keep it to 1-2 sentences max. Varied — don't repeat the same phrasing each time.",
+			"Keep it to 1-2 sentences max. Varied, don't repeat the same phrasing each time.",
 		].join("\n");
 
 		for await (const chunk of ctx.plugin.aiEngine.chat(

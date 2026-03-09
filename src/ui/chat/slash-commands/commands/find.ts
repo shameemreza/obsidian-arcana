@@ -32,7 +32,7 @@ export const findCommand: SlashCommand = {
 			const parts = [`Found **${top.length}** notes matching "${ctx.args}":\n`];
 
 			for (const { file, score, preview } of top) {
-				parts.push(`**[[${file.basename}]]** — \`${file.path}\` (score: ${score})`);
+				parts.push(`**[[${file.basename}]]** - \`${file.path}\` (score: ${score})`);
 				if (preview) parts.push(`> ${preview}\n`);
 			}
 

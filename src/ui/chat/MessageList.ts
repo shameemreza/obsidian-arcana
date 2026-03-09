@@ -146,7 +146,7 @@ export class MessageList {
 
 	private async saveAsNote(content: string): Promise<void> {
 		try {
-			const title = `Chat — ${new Date().toLocaleDateString("en-US", {
+			const title = `Chat - ${new Date().toLocaleDateString("en-US", {
 				year: "numeric",
 				month: "short",
 				day: "numeric",

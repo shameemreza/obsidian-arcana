@@ -10,7 +10,7 @@ export interface ToolDefinition {
 	name: string;
 	source: ToolSource;
 	description: string;
-	/** MCP-only fields — used when source is "mcp" (Phase 9). */
+	/** MCP-only fields, used when source is "mcp" (Phase 9). */
 	server?: string;
 	tool?: string;
 }
@@ -28,7 +28,7 @@ export interface CustomCommand {
 	outputFolder?: string;
 	/** Tools the AI can call during execution. */
 	tools: ToolDefinition[];
-	/** The markdown body — instructions for the AI agent. */
+	/** The markdown body with instructions for the AI agent. */
 	instructions: string;
 	/** Path to the source file in the vault. */
 	filePath: string;

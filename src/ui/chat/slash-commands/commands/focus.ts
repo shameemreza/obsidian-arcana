@@ -49,7 +49,7 @@ export const focusCommand: SlashCommand = {
 function buildTimerMessage(taskLabel: string, total: number, remaining: string, ticking: boolean): string {
 	const header = ticking ? "Focus session in progress" : "Focus session started";
 	return [
-		`**${header}** — ${total} minutes on ${taskLabel}`,
+		`**${header}** - ${total} minutes on ${taskLabel}`,
 		"",
 		`\`${remaining}\` remaining`,
 		"",

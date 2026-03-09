@@ -188,7 +188,7 @@ export class SkillRunner {
 		if (command.output === "chat") return;
 
 		if (command.output === "note" || command.output === "both") {
-			const title = `${capitalize(command.name)} — ${new Date().toLocaleDateString()}`;
+			const title = `${capitalize(command.name)} - ${new Date().toLocaleDateString()}`;
 			await this.noteCreator.createNote({
 				title,
 				content,
@@ -289,7 +289,7 @@ function parseToolCalls(text: string): ToolCallRequest[] {
 				});
 			}
 		} catch {
-			// Malformed JSON — skip this tool call
+			// Malformed JSON - skip this tool call
 		}
 	}
 

@@ -116,7 +116,7 @@ export const connectCommand: SlashCommand = {
 
 			const parts = [`Connections for **${file.basename}**:\n`];
 			for (const c of top) {
-				parts.push(`- **[[${c.basename}]]** — \`${c.path}\` (strength: ${c.score})`);
+				parts.push(`- **[[${c.basename}]]** - \`${c.path}\` (strength: ${c.score})`);
 				if (c.preview) parts.push(`  > ${c.preview}`);
 			}
 			parts.push("", "Consider linking these notes together with `[[wikilinks]]`.");

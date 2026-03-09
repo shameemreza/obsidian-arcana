@@ -16,7 +16,7 @@ const UNTITLED = "New conversation";
 /**
  * Persists chat conversations as markdown files.
  * Uses vault.adapter (filesystem-level) throughout so dot-prefixed
- * folders like `.arcana/chats/` work reliably — Obsidian's high-level
+ * folders like `.arcana/chats/` work reliably. Obsidian's high-level
  * vault API doesn't index hidden paths.
  */
 export class ChatHistory {

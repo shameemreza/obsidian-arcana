@@ -2,6 +2,8 @@ import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type ArcanaPlugin from "./main";
 import {
 	AI_PROVIDERS,
+	TASK_STATUSES,
+	TASK_PRIORITIES,
 	VOICE_PROVIDERS,
 	CHRONOTYPES,
 	NOTIFICATION_LEVELS,
@@ -34,6 +36,8 @@ export interface ArcanaSettings {
 
 	// Tasks
 	taskFolderPath: string;
+	additionalTaskFolders: string[];
+	vaultWideTaskScan: boolean;
 	defaultTaskStatus: string;
 	defaultTaskPriority: string;
 
@@ -106,6 +110,8 @@ export const DEFAULT_SETTINGS: ArcanaSettings = {
 
 	// Tasks
 	taskFolderPath: DEFAULT_TASK_FOLDER,
+	additionalTaskFolders: [],
+	vaultWideTaskScan: true,
 	defaultTaskStatus: "inbox",
 	defaultTaskPriority: "medium",
 
@@ -292,15 +298,15 @@ export class ArcanaSettingTab extends PluginSettingTab {
 							await this.plugin.aiEngine.testConnection();
 						new Notice(
 							result.ok
-								? `✓ ${result.message}`
-								: `✗ ${result.message}`,
+								? `OK: ${result.message}`
+								: `Error: ${result.message}`,
 						);
 					} catch (error) {
 						const msg =
 							error instanceof Error
 								? error.message
 								: String(error);
-						new Notice(`✗ ${msg}`);
+						new Notice(`Error: ${msg}`);
 					}
 					btn.setDisabled(false);
 					btn.setButtonText("Test");
@@ -335,7 +341,7 @@ export class ArcanaSettingTab extends PluginSettingTab {
 			"<strong>How to add a custom command:</strong>",
 			"<ol style='margin:0.5em 0 0.5em 1.2em;padding:0;'>",
 			"<li>Open your vault folder in your OS file manager (Finder, Explorer, etc.).</li>",
-			"<li>Show hidden files — on macOS press <code>Cmd+Shift+.</code>, " +
+			"<li>Show hidden files - on macOS press <code>Cmd+Shift+.</code>, " +
 			"on Windows enable <strong>Hidden items</strong> in the View menu.</li>",
 			"<li>Navigate to <code>.arcana/commands/</code> inside your vault.</li>",
 			"<li>Create a new <code>.md</code> file (or copy one of the examples).</li>",
@@ -361,7 +367,7 @@ export class ArcanaSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Task folder")
-			.setDesc("Folder where task notes are stored.")
+			.setDesc("Folder where new task notes are created.")
 			.addText((text) =>
 				text
 					.setPlaceholder(DEFAULT_TASK_FOLDER)
@@ -371,6 +377,68 @@ export class ArcanaSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Vault-wide task discovery")
+			.setDesc(
+				"Scan all markdown files for notes with Arcana task frontmatter, regardless of which folder they live in.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.vaultWideTaskScan)
+					.onChange(async (value) => {
+						this.plugin.settings.vaultWideTaskScan = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Additional task folders")
+			.setDesc(
+				"Extra folders to scan for tasks (comma-separated). Useful if you keep project-specific tasks in separate folders.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Projects/, Work/")
+					.setValue(this.plugin.settings.additionalTaskFolders.join(", "))
+					.onChange(async (value) => {
+						this.plugin.settings.additionalTaskFolders = value
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Default task status")
+			.setDesc("Status assigned to newly created tasks.")
+			.addDropdown((dropdown) => {
+				for (const s of TASK_STATUSES) {
+					dropdown.addOption(s, s.charAt(0).toUpperCase() + s.slice(1));
+				}
+				dropdown
+					.setValue(this.plugin.settings.defaultTaskStatus)
+					.onChange(async (value) => {
+						this.plugin.settings.defaultTaskStatus = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Default task priority")
+			.setDesc("Priority assigned to newly created tasks.")
+			.addDropdown((dropdown) => {
+				for (const p of TASK_PRIORITIES) {
+					dropdown.addOption(p, p.charAt(0).toUpperCase() + p.slice(1));
+				}
+				dropdown
+					.setValue(this.plugin.settings.defaultTaskPriority)
+					.onChange(async (value) => {
+						this.plugin.settings.defaultTaskPriority = value;
+						await this.plugin.saveSettings();
+					});
+			});
 
 		// --- Voice ---
 		new Setting(containerEl).setName("Voice").setHeading();

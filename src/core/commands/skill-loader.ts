@@ -92,7 +92,7 @@ export class SkillLoader {
 	}
 
 	/**
-	 * Use the adapter API for folder creation — it works reliably
+	 * Use the adapter API for folder creation - it works reliably
 	 * for dotfolders unlike vault.createFolder().
 	 */
 	private async ensureFolder(): Promise<void> {
@@ -273,7 +273,7 @@ const EXAMPLE_COMMANDS: { filename: string; content: string }[] = [
 		filename: "morning.md",
 		content: `---
 name: morning
-description: Morning briefing — tasks, priorities, and plan for the day
+description: Morning briefing with tasks, priorities, and plan for the day
 icon: sunrise
 output: chat
 tools:
@@ -295,9 +295,9 @@ Start by searching for open tasks, then check if a daily note exists for today.
 
 Write a brief, energizing morning briefing covering:
 
-1. **Today's tasks** — open tasks sorted by priority and due date.
-2. **Overdue items** — anything past its due date (flag these clearly).
-3. **Suggested focus** — pick the 2-3 most important things and explain why.
+1. **Today's tasks** - open tasks sorted by priority and due date.
+2. **Overdue items** - anything past its due date (flag these clearly).
+3. **Suggested focus** - pick the 2-3 most important things and explain why.
 
 Keep it concise. No filler. Like a sharp colleague handing you a one-page brief
 at the start of the day.
@@ -309,7 +309,7 @@ If a tool returns nothing useful, skip that section and work with what you have.
 		filename: "weekly-review.md",
 		content: `---
 name: weekly-review
-description: Weekly review — what happened, what's next
+description: Weekly review of what happened and what's next
 icon: calendar-check
 output: note
 output_folder: Weekly Notes
@@ -333,10 +333,10 @@ Search for completed tasks (look for status "done"), open tasks, and recent note
 
 Write a weekly review covering:
 
-1. **Wins** — tasks completed this week. Acknowledge the progress.
-2. **Still open** — remaining tasks, sorted by priority.
-3. **Notes created** — new notes or ideas captured this week.
-4. **Next week** — suggest 3 priorities for the coming week based on what's open.
+1. **Wins** - tasks completed this week. Acknowledge the progress.
+2. **Still open** - remaining tasks, sorted by priority.
+3. **Notes created** - new notes or ideas captured this week.
+4. **Next week** - suggest 3 priorities for the coming week based on what's open.
 
 Be warm but direct. This is a reflection, not a report. End with one question
 that helps the user think about what they want next week to look like.

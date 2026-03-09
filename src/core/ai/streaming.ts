@@ -262,7 +262,7 @@ function extractErrorMessage(body: string, status: number): string {
 		if (typeof json?.message === "string") return json.message;
 		if (typeof json?.error === "string") return json.error;
 	} catch {
-		// Body isn't JSON — use it as-is
+		// Body isn't JSON - use it as-is
 	}
 	return body.slice(0, 200) || `HTTP ${status}`;
 }
