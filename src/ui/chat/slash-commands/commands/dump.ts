@@ -1,8 +1,6 @@
 import { Notice } from "obsidian";
 import type { SlashCommand, SlashCommandContext } from "../types";
 
-const RENDER_THROTTLE_MS = 100;
-
 export const dumpCommand: SlashCommand = {
 	name: "dump",
 	description: "Brain dump \u2014 capture messy thoughts, extract tasks and notes",

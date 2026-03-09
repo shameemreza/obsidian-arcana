@@ -14,6 +14,20 @@ Open the chat panel from the ribbon icon or with the **Toggle chat panel** comma
 - **Markdown rendering** so AI responses show as proper Obsidian markdown including code blocks, lists, and links.
 - **Copy and Save** buttons on every AI response to clipboard or as a new note.
 - **New conversation** button (+) to clear the chat and start fresh.
+- **Conversation history** that persists across plugin reloads.
+- **Auto-titling** that names conversations based on what was discussed, not just what was asked.
+
+### Chat History
+
+Conversations are saved as markdown files in your vault (default: `.arcana/chats/`). Each file has YAML frontmatter with the title, timestamps, and message count.
+
+- **Auto-save** after every message exchange and when the chat panel closes.
+- **History picker** (clock icon in the header) to browse, search, and load previous conversations.
+- **Active conversation badge** so you always know which chat you're in.
+- **Delete per conversation** with a trash icon on hover, or **Delete all** to clear history.
+- **AI-generated titles** using both your message and the AI's response for accuracy. Slash command conversations get titled too.
+
+The history folder is configurable in **Settings > Privacy > Chat history folder**.
 
 ### Context Modes
 
@@ -275,6 +289,7 @@ src/
 │   │       ├── anthropic.ts        # Claude Messages API.
 │   │       ├── gemini.ts           # Gemini REST API.
 │   │       └── ollama.ts           # Local Ollama.
+│   ├── chat-history.ts             # Conversation persistence as markdown files.
 │   └── vault/
 │       ├── vault-intel.ts          # Vault scanning and intelligence.
 │       ├── note-creator.ts         # Note and task creation.
@@ -285,6 +300,7 @@ src/
 │       ├── ChatInput.ts            # Input with mention and slash autocomplete.
 │       ├── MessageList.ts          # Message rendering and streaming.
 │       ├── ContextPicker.ts        # Note/Folder/Vault/None mode selector.
+│       ├── ConversationPicker.ts   # History browser modal with delete.
 │       └── slash-commands/
 │           ├── types.ts            # Command interface.
 │           ├── registry.ts         # Command registry and parser.

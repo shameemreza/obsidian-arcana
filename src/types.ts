@@ -65,6 +65,24 @@ export interface FolderDecoration {
 	opacity?: number;
 }
 
+export interface Conversation {
+	id: string;
+	title: string;
+	created: number;
+	updated: number;
+	messages: ChatMessage[];
+	filePath?: string;
+}
+
+export interface ConversationMeta {
+	id: string;
+	title: string;
+	created: number;
+	updated: number;
+	messageCount: number;
+	filePath: string;
+}
+
 export interface MCPServerConfig {
 	name: string;
 	command: string;

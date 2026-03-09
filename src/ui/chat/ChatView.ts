@@ -1,10 +1,12 @@
 import { ItemView, Notice, type WorkspaceLeaf, setIcon } from "obsidian";
 import type ArcanaPlugin from "../../main";
 import { VIEW_TYPE_CHAT, PLUGIN_NAME } from "../../constants";
-import type { ChatMessage } from "../../types";
+import type { ChatMessage, Conversation } from "../../types";
+import { ChatHistory } from "../../core/chat-history";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { ContextPicker } from "./ContextPicker";
+import { ConversationPicker } from "./ConversationPicker";
 import {
 	type ContextMode,
 	buildContext,
@@ -60,6 +62,13 @@ export class ChatView extends ItemView {
 	private chatInput!: ChatInput;
 	private contextPicker!: ContextPicker;
 	private isStreaming = false;
+
+	private conversationId: string = ChatHistory.generateId();
+	private conversationTitle = "New conversation";
+	private conversationCreated: number = Date.now();
+	private conversationFilePath: string | undefined;
+	private titleGenerated = false;
+	private headerTitleEl!: HTMLElement;
 
 	constructor(leaf: WorkspaceLeaf, plugin: ArcanaPlugin) {
 		super(leaf);
@@ -121,33 +130,151 @@ export class ChatView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
+		await this.autoSave();
 		this.contextPicker?.destroy();
 	}
 
 	private buildHeader(container: HTMLElement): void {
 		const header = container.createDiv({ cls: "arcana-chat-header" });
 
-		const titleEl = header.createDiv({
+		const left = header.createDiv({
+			cls: "arcana-chat-header-left",
+		});
+
+		const titleEl = left.createDiv({
 			cls: "arcana-chat-header-title",
 		});
 		const titleIcon = titleEl.createSpan({ cls: "arcana-header-icon" });
 		setIcon(titleIcon, "sparkles");
-		titleEl.createSpan({ text: `${PLUGIN_NAME} Chat` });
+		this.headerTitleEl = titleEl.createSpan({
+			text: this.conversationTitle,
+		});
 
-		const newChatBtn = header.createEl("button", {
+		const actions = header.createDiv({
+			cls: "arcana-chat-header-actions",
+		});
+
+		const historyBtn = actions.createEl("button", {
+			cls: "clickable-icon arcana-history-btn",
+			attr: { "aria-label": "Conversation history" },
+		});
+		setIcon(historyBtn, "history");
+		historyBtn.addEventListener("click", () => this.openConversationPicker());
+
+		const newChatBtn = actions.createEl("button", {
 			cls: "clickable-icon arcana-new-chat-btn",
 			attr: { "aria-label": "New conversation" },
 		});
 		setIcon(newChatBtn, "plus");
-		newChatBtn.addEventListener("click", () => this.clearConversation());
+		newChatBtn.addEventListener("click", () => this.newConversation());
 	}
 
-	private clearConversation(): void {
+	// ── Conversation lifecycle ──────────────────────────────────
+
+	private async newConversation(): Promise<void> {
 		if (this.isStreaming) return;
+
+		await this.autoSave();
+
 		this.messages = [];
+		this.conversationId = ChatHistory.generateId();
+		this.conversationTitle = "New conversation";
+		this.conversationCreated = Date.now();
+		this.conversationFilePath = undefined;
+		this.titleGenerated = false;
+
+		this.headerTitleEl.setText(this.conversationTitle);
 		this.messageList.clear();
 		this.contextPicker.resetManualOverride();
 	}
+
+	private async autoSave(): Promise<void> {
+		if (this.messages.length === 0) return;
+
+		try {
+			const conv = this.buildConversation();
+			const path = await this.plugin.chatHistory.save(conv);
+			this.conversationFilePath = path;
+		} catch (e) {
+			console.error("[Arcana] Failed to save conversation:", e);
+		}
+	}
+
+	private buildConversation(): Conversation {
+		return {
+			id: this.conversationId,
+			title: this.conversationTitle,
+			created: this.conversationCreated,
+			updated: Date.now(),
+			messages: [...this.messages],
+			filePath: this.conversationFilePath,
+		};
+	}
+
+	private async loadConversation(filePath: string): Promise<void> {
+		const conv = await this.plugin.chatHistory.load(filePath);
+		if (!conv) {
+			new Notice("Could not load conversation");
+			return;
+		}
+
+		this.messages = conv.messages;
+		this.conversationId = conv.id;
+		this.conversationTitle = conv.title;
+		this.conversationCreated = conv.created;
+		this.conversationFilePath = conv.filePath;
+		this.titleGenerated = conv.title !== "New conversation";
+
+		this.headerTitleEl.setText(this.conversationTitle);
+		this.messageList.clear();
+
+		for (const msg of this.messages) {
+			this.messageList.addMessage(msg);
+		}
+
+		this.contextPicker.resetManualOverride();
+	}
+
+	private async openConversationPicker(): Promise<void> {
+		if (this.isStreaming) return;
+
+		const list = await this.plugin.chatHistory.list();
+		if (list.length === 0) {
+			new Notice("No saved conversations yet");
+			return;
+		}
+
+		new ConversationPicker(
+			this.app,
+			list,
+			this.plugin.chatHistory,
+			this.conversationId,
+			async (meta) => {
+				await this.autoSave();
+				await this.loadConversation(meta.filePath);
+			},
+		).open();
+	}
+
+	private async autoTitle(): Promise<void> {
+		if (this.titleGenerated) return;
+		this.titleGenerated = true;
+
+		const title =
+			await this.plugin.chatHistory.generateTitle(this.messages);
+
+		this.conversationTitle = title;
+		this.headerTitleEl.setText(title);
+
+		if (this.conversationFilePath) {
+			const conv = this.buildConversation();
+			const newPath =
+				await this.plugin.chatHistory.renameForTitle(conv);
+			this.conversationFilePath = newPath;
+		}
+	}
+
+	// ── Context & input ─────────────────────────────────────────
 
 	private handleContextModeChange(_mode: ContextMode): void {
 		this.contextPicker.updateTokenCount(this.chatInput.getValue());
@@ -156,6 +283,8 @@ export class ChatView extends ItemView {
 	private handleInputChange(text: string): void {
 		this.contextPicker.updateTokenCount(text);
 	}
+
+	// ── Send flow ───────────────────────────────────────────────
 
 	private async handleSend(text: string): Promise<void> {
 		if (this.isStreaming) return;
@@ -174,6 +303,9 @@ export class ChatView extends ItemView {
 			new Notice("AI provider is not configured. Check Arcana settings.");
 			return;
 		}
+
+		const isFirstUserMessage =
+			!this.messages.some((m) => m.role === "user");
 
 		const userMessage: ChatMessage = {
 			role: "user",
@@ -250,6 +382,12 @@ export class ChatView extends ItemView {
 			this.isStreaming = false;
 			this.chatInput.setEnabled(true);
 			this.chatInput.focus();
+
+			await this.autoSave();
+
+			if (isFirstUserMessage) {
+				this.autoTitle();
+			}
 		}
 	}
 
@@ -276,9 +414,12 @@ export class ChatView extends ItemView {
 
 	private async executeSlashCommand(
 		rawText: string,
-		commandName: string,
+		_commandName: string,
 		args: string,
 	): Promise<void> {
+		const isFirstUserMessage =
+			!this.messages.some((m) => m.role === "user");
+
 		const userMessage: ChatMessage = {
 			role: "user",
 			content: rawText,
@@ -330,6 +471,12 @@ export class ChatView extends ItemView {
 			this.isStreaming = false;
 			this.chatInput.setEnabled(true);
 			this.chatInput.focus();
+
+			await this.autoSave();
+
+			if (isFirstUserMessage) {
+				this.autoTitle();
+			}
 		}
 	}
 }

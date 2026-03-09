@@ -5,6 +5,7 @@ import { AIEngine } from "./core/ai/ai-engine";
 import { VaultIntel } from "./core/vault/vault-intel";
 import { NoteCreator } from "./core/vault/note-creator";
 import { TaskParser } from "./core/vault/task-parser";
+import { ChatHistory } from "./core/chat-history";
 import { ChatView } from "./ui/chat/ChatView";
 import { VIEW_TYPE_CHAT } from "./constants";
 
@@ -14,6 +15,7 @@ export default class ArcanaPlugin extends Plugin {
 	vaultIntel!: VaultIntel;
 	noteCreator!: NoteCreator;
 	taskParser!: TaskParser;
+	chatHistory!: ChatHistory;
 
 	async onload() {
 		await this.loadSettings();
@@ -22,6 +24,11 @@ export default class ArcanaPlugin extends Plugin {
 		this.vaultIntel = new VaultIntel(this.app, this.aiEngine);
 		this.noteCreator = new NoteCreator(this.app, this.vaultIntel);
 		this.taskParser = new TaskParser(this.aiEngine);
+		this.chatHistory = new ChatHistory(
+			this.app,
+			() => this.settings,
+			this.aiEngine,
+		);
 
 		this.registerView(
 			VIEW_TYPE_CHAT,
