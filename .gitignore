@@ -17,5 +17,8 @@ Thumbs.db
 .env
 .env.local
 
+# Plugin data (contains API keys)
+data.json
+
 # Private
 TASKS.md

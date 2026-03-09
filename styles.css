@@ -1,1 +1,429 @@
 /* Arcana — obsidian-arcana plugin styles */
+
+/* ============================================================
+   Chat Container
+   ============================================================ */
+
+.arcana-chat-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+}
+
+/* ============================================================
+   Chat Header
+   ============================================================ */
+
+.arcana-chat-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--size-4-2) var(--size-4-3);
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+}
+
+.arcana-chat-header-title {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	font-weight: var(--font-semibold);
+	font-size: var(--font-ui-medium);
+}
+
+.arcana-header-icon {
+	display: flex;
+	color: var(--interactive-accent);
+}
+
+.arcana-header-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.arcana-new-chat-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* ============================================================
+   Messages Area
+   ============================================================ */
+
+.arcana-chat-messages {
+	flex: 1;
+	overflow-y: auto;
+	padding: var(--size-4-3);
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-4);
+}
+
+/* ============================================================
+   Empty State
+   ============================================================ */
+
+.arcana-chat-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	text-align: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-8) var(--size-4-4);
+}
+
+.arcana-empty-icon {
+	color: var(--text-faint);
+}
+
+.arcana-empty-icon svg {
+	width: 32px;
+	height: 32px;
+}
+
+.arcana-empty-title {
+	font-weight: var(--font-semibold);
+	font-size: var(--font-ui-medium);
+	color: var(--text-normal);
+}
+
+.arcana-empty-desc {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	max-width: 260px;
+	line-height: 1.6;
+}
+
+/* ============================================================
+   Message Bubbles
+   ============================================================ */
+
+.arcana-message {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+}
+
+.arcana-message-role {
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+	padding-left: var(--size-4-1);
+}
+
+.arcana-message-content {
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	line-height: 1.6;
+	overflow-wrap: break-word;
+	word-break: break-word;
+}
+
+.arcana-message-user .arcana-message-content {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-bottom-right-radius: var(--radius-s);
+}
+
+.arcana-message-assistant .arcana-message-content {
+	background: var(--background-secondary);
+	border-bottom-left-radius: var(--radius-s);
+}
+
+/* Markdown inside assistant messages */
+
+.arcana-message-assistant .arcana-message-content > *:first-child {
+	margin-top: 0;
+}
+
+.arcana-message-assistant .arcana-message-content > *:last-child {
+	margin-bottom: 0;
+}
+
+.arcana-message-assistant .arcana-message-content p {
+	margin: 0.4em 0;
+}
+
+.arcana-message-assistant .arcana-message-content code {
+	font-size: var(--font-smaller);
+}
+
+.arcana-message-assistant .arcana-message-content pre {
+	margin: 0.6em 0;
+	border-radius: var(--radius-s);
+}
+
+.arcana-message-assistant .arcana-message-content ul,
+.arcana-message-assistant .arcana-message-content ol {
+	margin: 0.4em 0;
+	padding-left: 1.4em;
+}
+
+/* ============================================================
+   Message Action Buttons
+   ============================================================ */
+
+.arcana-message-actions {
+	display: flex;
+	gap: var(--size-4-1);
+	padding-left: var(--size-4-1);
+	opacity: 0;
+	transition: opacity 150ms ease;
+}
+
+.arcana-message:hover .arcana-message-actions {
+	opacity: 1;
+}
+
+.arcana-action-btn {
+	color: var(--text-faint);
+}
+
+.arcana-action-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+.arcana-action-btn:hover {
+	color: var(--text-normal);
+}
+
+/* ============================================================
+   Typing Indicator
+   ============================================================ */
+
+.arcana-typing-indicator {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	padding: var(--size-4-1) 0;
+}
+
+.arcana-typing-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--text-faint);
+	animation: arcana-typing-bounce 1.4s ease-in-out infinite;
+}
+
+.arcana-typing-dot:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.arcana-typing-dot:nth-child(3) {
+	animation-delay: 0.4s;
+}
+
+@keyframes arcana-typing-bounce {
+	0%,
+	60%,
+	100% {
+		transform: translateY(0);
+	}
+	30% {
+		transform: translateY(-4px);
+	}
+}
+
+/* ============================================================
+   Chat Input Area
+   ============================================================ */
+
+.arcana-chat-input-area {
+	padding: var(--size-4-2) var(--size-4-3);
+	border-top: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+}
+
+.arcana-input-wrapper {
+	display: flex;
+	align-items: flex-end;
+	gap: var(--size-4-2);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	padding: var(--size-4-1) var(--size-4-2);
+	transition: border-color 150ms ease;
+}
+
+.arcana-input-wrapper:focus-within {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.arcana-chat-textarea {
+	flex: 1;
+	background: transparent;
+	border: none;
+	outline: none;
+	resize: none;
+	font-family: var(--font-interface);
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	line-height: 1.5;
+	max-height: 150px;
+	overflow-y: auto;
+	padding: var(--size-4-1) 0;
+}
+
+.arcana-chat-textarea::placeholder {
+	color: var(--text-faint);
+}
+
+.arcana-send-btn {
+	flex-shrink: 0;
+	color: var(--interactive-accent);
+	border-radius: var(--radius-s);
+}
+
+.arcana-send-btn svg {
+	width: 18px;
+	height: 18px;
+}
+
+.arcana-send-btn:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+
+.arcana-chat-textarea:disabled {
+	opacity: 0.5;
+}
+
+/* ============================================================
+   Context Picker
+   ============================================================ */
+
+.arcana-context-area {
+	flex-shrink: 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.arcana-context-picker {
+	padding: var(--size-4-1) var(--size-4-3);
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+}
+
+.arcana-context-modes {
+	display: flex;
+	gap: 1px;
+	background: var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	padding: 2px;
+}
+
+.arcana-context-mode-btn {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--size-4-1);
+	padding: var(--size-4-1) var(--size-4-2);
+	border: none;
+	border-radius: calc(var(--radius-s) - 1px);
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	cursor: pointer;
+	transition: color 120ms ease, background 120ms ease;
+}
+
+.arcana-context-mode-btn:hover {
+	color: var(--text-normal);
+}
+
+.arcana-context-mode-btn.is-active {
+	background: var(--background-primary);
+	color: var(--interactive-accent);
+	font-weight: var(--font-semibold);
+}
+
+.arcana-context-mode-icon {
+	display: flex;
+}
+
+.arcana-context-mode-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+.arcana-context-mode-label {
+	line-height: 1;
+}
+
+.arcana-context-info {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 var(--size-4-1);
+}
+
+.arcana-context-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 60%;
+}
+
+.arcana-context-tokens {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.arcana-context-tokens.arcana-tokens-warning {
+	color: var(--text-warning);
+}
+
+/* ============================================================
+   @[[note]] Mention Autocomplete
+   ============================================================ */
+
+.arcana-mention-suggest {
+	position: relative;
+	max-height: 240px;
+	overflow-y: auto;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	margin: 0 var(--size-4-2) var(--size-4-1);
+	box-shadow: var(--shadow-s);
+	z-index: var(--layer-popover);
+}
+
+.arcana-mention-item {
+	display: flex;
+	align-items: baseline;
+	gap: var(--size-4-2);
+	padding: var(--size-4-1) var(--size-4-3);
+	cursor: pointer;
+	transition: background 80ms ease;
+}
+
+.arcana-mention-item:hover,
+.arcana-mention-item.is-selected {
+	background: var(--background-modifier-hover);
+}
+
+.arcana-mention-name {
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	font-weight: var(--font-medium);
+}
+
+.arcana-mention-path {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

@@ -1,4 +1,4 @@
-import { requestUrl } from "obsidian";
+import { Platform, requestUrl } from "obsidian";
 
 export interface SSEEvent {
 	event?: string;
@@ -94,40 +94,165 @@ export async function* parseNDJSON(
 }
 
 /**
- * Fetch with streaming support and request timeout.
- * Timeout applies to the initial connection only — once streaming starts,
- * the timeout is cleared so long responses aren't interrupted.
+ * Fetch with streaming support.
+ *
+ * Desktop (Electron): Uses Node.js https/http modules to bypass CORS.
+ * Mobile: Uses Obsidian's requestUrl (full response, not true streaming).
+ *
+ * Both return a standard Response with a readable body stream.
  */
 export async function fetchStreaming(
 	url: string,
 	init: RequestInit,
 	timeoutMs = 30_000,
 ): Promise<Response> {
-	const controller = new AbortController();
-	const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+	if (Platform.isDesktop) {
+		return fetchStreamingDesktop(url, init, timeoutMs);
+	}
+	return fetchStreamingMobile(url, init);
+}
 
-	try {
-		const response = await fetch(url, {
-			...init,
-			signal: controller.signal,
+/* ------------------------------------------------------------------ */
+/*  Desktop: Node.js https/http (available in Electron, bypasses CORS) */
+/* ------------------------------------------------------------------ */
+
+// Node.js require is available at runtime (esbuild outputs CJS, builtins are external)
+declare const require: (id: string) => NodeHttpModule;
+
+interface NodeHttpModule {
+	request(
+		options: Record<string, unknown>,
+		callback: (res: NodeIncomingMessage) => void,
+	): NodeClientRequest;
+}
+
+interface NodeIncomingMessage {
+	statusCode?: number;
+	on(event: "data", listener: (chunk: Uint8Array) => void): void;
+	on(event: "end", listener: () => void): void;
+	on(event: "error", listener: (err: Error) => void): void;
+	destroy(): void;
+}
+
+interface NodeClientRequest {
+	on(event: "error", listener: (err: Error) => void): void;
+	write(data: string): void;
+	end(): void;
+	destroy(): void;
+}
+
+async function fetchStreamingDesktop(
+	url: string,
+	init: RequestInit,
+	timeoutMs: number,
+): Promise<Response> {
+	return new Promise<Response>((resolve, reject) => {
+		const parsed = new URL(url);
+		const isSecure = parsed.protocol === "https:";
+		const mod: NodeHttpModule = require(isSecure ? "https" : "http");
+
+		const options: Record<string, unknown> = {
+			hostname: parsed.hostname,
+			port:
+				parsed.port || (isSecure ? 443 : 80),
+			path: parsed.pathname + parsed.search,
+			method: (init.method ?? "GET").toUpperCase(),
+			headers: init.headers as Record<string, string>,
+		};
+
+		const req = mod.request(options, (res: NodeIncomingMessage) => {
+			clearTimeout(timer);
+
+			const status = res.statusCode ?? 500;
+
+			if (status >= 400) {
+				const chunks: Uint8Array[] = [];
+				res.on("data", (chunk: Uint8Array) => {
+					chunks.push(chunk);
+				});
+				res.on("end", () => {
+					const body = new TextDecoder().decode(concatBytes(chunks));
+					reject(
+						new Error(
+							`API error ${status}: ${extractErrorMessage(body, status)}`,
+						),
+					);
+				});
+				return;
+			}
+
+			const stream = new ReadableStream<Uint8Array>({
+				start(controller) {
+					res.on("data", (chunk: Uint8Array) => {
+						controller.enqueue(new Uint8Array(chunk));
+					});
+					res.on("end", () => controller.close());
+					res.on("error", (err: Error) => controller.error(err));
+				},
+				cancel() {
+					res.destroy();
+				},
+			});
+
+			resolve(new Response(stream, { status }));
 		});
 
-		if (!response.ok) {
-			const text = await response.text().catch(() => "");
-			throw new Error(
-				`API error ${response.status}: ${extractErrorMessage(text, response.status)}`,
-			);
-		}
+		const timer = setTimeout(() => {
+			req.destroy();
+			reject(new Error(`Request timed out after ${timeoutMs}ms`));
+		}, timeoutMs);
 
-		window.clearTimeout(timeout);
-		return response;
-	} catch (error) {
-		window.clearTimeout(timeout);
-		if (error instanceof DOMException && error.name === "AbortError") {
-			throw new Error(`Request timed out after ${timeoutMs}ms`);
+		req.on("error", (err: Error) => {
+			clearTimeout(timer);
+			reject(err);
+		});
+
+		if (init.body) {
+			req.write(init.body as string);
 		}
-		throw error;
+		req.end();
+	});
+}
+
+/* ------------------------------------------------------------------ */
+/*  Mobile: Obsidian requestUrl (bypasses CORS, but non-streaming)     */
+/* ------------------------------------------------------------------ */
+
+async function fetchStreamingMobile(
+	url: string,
+	init: RequestInit,
+): Promise<Response> {
+	const response = await requestUrl({
+		url,
+		method: init.method ?? "GET",
+		headers: init.headers as Record<string, string>,
+		body: typeof init.body === "string" ? init.body : undefined,
+	});
+
+	const encoder = new TextEncoder();
+	const stream = new ReadableStream<Uint8Array>({
+		start(controller) {
+			controller.enqueue(encoder.encode(response.text));
+			controller.close();
+		},
+	});
+
+	return new Response(stream, { status: response.status });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Shared utilities                                                    */
+/* ------------------------------------------------------------------ */
+
+function concatBytes(chunks: Uint8Array[]): Uint8Array {
+	const total = chunks.reduce((sum, c) => sum + c.length, 0);
+	const result = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		result.set(chunk, offset);
+		offset += chunk.length;
 	}
+	return result;
 }
 
 function extractErrorMessage(body: string, status: number): string {
