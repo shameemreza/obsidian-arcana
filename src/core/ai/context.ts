@@ -1,7 +1,7 @@
 import { type App, type TFile, TFolder } from "obsidian";
 import type { ArcanaSettings } from "../../settings";
 
-export type ContextMode = "note" | "folder" | "vault";
+export type ContextMode = "note" | "folder" | "vault" | "none";
 
 export interface ContextResult {
 	mode: ContextMode;
@@ -55,6 +55,9 @@ export async function buildContext(
 			break;
 		case "vault":
 			({ content: modeContent, label } = await buildVaultContext(app, userMessage, budgetForMode));
+			break;
+		case "none":
+			label = "No context";
 			break;
 	}
 
@@ -406,6 +409,9 @@ export async function estimateContextTokens(
 		}
 		case "vault": {
 			modeTokens = 2000;
+			break;
+		}
+		case "none": {
 			break;
 		}
 	}

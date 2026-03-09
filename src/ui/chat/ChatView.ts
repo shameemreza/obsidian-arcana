@@ -11,6 +11,8 @@ import {
 	formatContextForPrompt,
 	stripMentions,
 } from "../../core/ai/context";
+import { parseSlashCommand } from "./slash-commands/registry";
+import type { SlashCommandContext } from "./slash-commands/types";
 
 const SYSTEM_PROMPT = `You are ${PLUGIN_NAME}, a human-feeling assistant embedded in Obsidian. You help with notes, tasks, and knowledge management. You sound like a sharp, friendly colleague, not a chatbot.
 
@@ -144,6 +146,7 @@ export class ChatView extends ItemView {
 		if (this.isStreaming) return;
 		this.messages = [];
 		this.messageList.clear();
+		this.contextPicker.resetManualOverride();
 	}
 
 	private handleContextModeChange(_mode: ContextMode): void {
@@ -159,6 +162,12 @@ export class ChatView extends ItemView {
 
 		const trimmed = text.trim();
 		if (!trimmed) return;
+
+		const parsed = parseSlashCommand(trimmed);
+		if (parsed) {
+			await this.executeSlashCommand(trimmed, parsed.command.name, parsed.args);
+			return;
+		}
 
 		const provider = this.plugin.aiEngine.getActiveProvider();
 		if (!provider.isConfigured()) {
@@ -189,10 +198,15 @@ export class ChatView extends ItemView {
 		this.chatInput.setEnabled(false);
 
 		try {
+			const effectiveMode = this.inferContextMode(trimmed);
+			if (effectiveMode !== this.contextPicker.getMode()) {
+				this.contextPicker.setMode(effectiveMode);
+			}
+
 			const ctx = await buildContext(
 				this.app,
 				this.plugin.settings,
-				this.contextPicker.getMode(),
+				effectiveMode,
 				trimmed,
 			);
 
@@ -233,6 +247,86 @@ export class ChatView extends ItemView {
 				assistantEl,
 				assistantMessage.content,
 			);
+			this.isStreaming = false;
+			this.chatInput.setEnabled(true);
+			this.chatInput.focus();
+		}
+	}
+
+	private inferContextMode(text: string): ContextMode {
+		if (this.contextPicker.isManualOverride()) {
+			return this.contextPicker.getMode();
+		}
+
+		const hasNoteMention = /@\[\[.+\]\]/.test(text);
+		if (hasNoteMention) return this.contextPicker.getMode();
+
+		const lower = text.toLowerCase();
+		const vaultPatterns = /\b(search|find|across|vault|all notes|everywhere|every note|look through)\b/;
+		if (vaultPatterns.test(lower)) return "vault";
+
+		const folderPatterns = /\b(this folder|current folder|folder|sibling|nearby notes)\b/;
+		if (folderPatterns.test(lower)) return "folder";
+
+		const notePatterns = /\b(this note|current note|this page|this file|the note)\b/;
+		if (notePatterns.test(lower)) return "note";
+
+		return this.contextPicker.getMode();
+	}
+
+	private async executeSlashCommand(
+		rawText: string,
+		commandName: string,
+		args: string,
+	): Promise<void> {
+		const userMessage: ChatMessage = {
+			role: "user",
+			content: rawText,
+			timestamp: Date.now(),
+		};
+		this.messages.push(userMessage);
+		this.messageList.addMessage(userMessage);
+
+		this.isStreaming = true;
+		this.chatInput.setEnabled(false);
+
+		const cmdCtx: SlashCommandContext = {
+			plugin: this.plugin,
+			args,
+			messages: this.messages,
+			addAssistantMessage: (content: string, streaming = false) => {
+				const msg: ChatMessage = {
+					role: "assistant",
+					content,
+					timestamp: Date.now(),
+				};
+				if (!streaming) this.messages.push(msg);
+				return this.messageList.addMessage(msg, streaming);
+			},
+			updateStreaming: (el, content) => {
+				this.messageList.updateStreaming(el, content);
+			},
+			finalizeStreaming: (el, content) => {
+				this.messageList.finalizeStreaming(el, content);
+			},
+			setInputEnabled: (enabled) => {
+				this.chatInput.setEnabled(enabled);
+			},
+			appendMessage: (msg) => {
+				this.messages.push(msg);
+			},
+		};
+
+		try {
+			const cmd = parseSlashCommand(rawText);
+			if (cmd) {
+				await cmd.command.execute(cmdCtx);
+			}
+		} catch (e) {
+			const errMsg = e instanceof Error ? e.message : "Unknown error";
+			const errEl = cmdCtx.addAssistantMessage("", false);
+			this.messageList.finalizeStreaming(errEl, `*Command error: ${errMsg}*`);
+		} finally {
 			this.isStreaming = false;
 			this.chatInput.setEnabled(true);
 			this.chatInput.focus();

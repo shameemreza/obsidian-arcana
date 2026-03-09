@@ -29,6 +29,7 @@ export class ContextPicker {
 	private tokenCountEl!: HTMLElement;
 	private modeButtons: Map<ContextMode, HTMLElement> = new Map();
 	private refreshTimer: number | null = null;
+	private manualOverride = false;
 
 	constructor(
 		containerEl: HTMLElement,
@@ -46,6 +47,27 @@ export class ContextPicker {
 
 	getMode(): ContextMode {
 		return this.mode;
+	}
+
+	isManualOverride(): boolean {
+		return this.manualOverride;
+	}
+
+	resetManualOverride(): void {
+		this.manualOverride = false;
+	}
+
+	setMode(mode: ContextMode): void {
+		if (mode === this.mode) return;
+		if (this.mode !== "none") {
+			this.modeButtons.get(this.mode)?.removeClass("is-active");
+		}
+		this.mode = mode;
+		if (mode !== "none") {
+			this.modeButtons.get(mode)?.addClass("is-active");
+		}
+		this.updateContextLabel();
+		this.computeTokenCount("");
 	}
 
 	refresh(): void {
@@ -90,7 +112,7 @@ export class ContextPicker {
 				btn.addClass("is-active");
 			}
 
-			btn.addEventListener("click", () => this.setMode(opt.mode));
+			btn.addEventListener("click", () => this.selectMode(opt.mode));
 			this.modeButtons.set(opt.mode, btn);
 		}
 
@@ -103,16 +125,14 @@ export class ContextPicker {
 		this.computeTokenCount("");
 	}
 
-	private setMode(mode: ContextMode): void {
-		if (mode === this.mode) return;
-
-		this.modeButtons.get(this.mode)?.removeClass("is-active");
-		this.mode = mode;
-		this.modeButtons.get(this.mode)?.addClass("is-active");
-
-		this.updateContextLabel();
-		this.computeTokenCount("");
-		this.onModeChange(mode);
+	private selectMode(mode: ContextMode): void {
+		this.manualOverride = true;
+		if (mode === this.mode) {
+			this.setMode("none");
+		} else {
+			this.setMode(mode);
+		}
+		this.onModeChange(this.mode);
 	}
 
 	private updateContextLabel(): void {
@@ -137,6 +157,9 @@ export class ContextPicker {
 			}
 			case "vault":
 				label = "Vault-wide search";
+				break;
+			case "none":
+				label = "No vault context";
 				break;
 		}
 

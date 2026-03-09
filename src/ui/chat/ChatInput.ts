@@ -1,14 +1,19 @@
 import { type App, setIcon, type TFile } from "obsidian";
+import { filterCommands } from "./slash-commands/registry";
+import type { SlashCommand } from "./slash-commands/types";
 
 export class ChatInput {
 	private app: App;
 	private textareaEl!: HTMLTextAreaElement;
 	private sendBtnEl!: HTMLButtonElement;
 	private suggestEl!: HTMLElement;
+	private slashSuggestEl!: HTMLElement;
 	private onSend: (text: string) => void;
 	private onInputChange: (text: string) => void;
 	private activeSuggestionIndex = -1;
 	private suggestions: TFile[] = [];
+	private slashSuggestions: SlashCommand[] = [];
+	private activeSlashIndex = -1;
 
 	constructor(
 		containerEl: HTMLElement,
@@ -41,15 +46,18 @@ export class ChatInput {
 		this.suggestEl = containerEl.createDiv({ cls: "arcana-mention-suggest" });
 		this.suggestEl.style.display = "none";
 
+		this.slashSuggestEl = containerEl.createDiv({ cls: "arcana-slash-suggest" });
+		this.slashSuggestEl.style.display = "none";
+
 		this.textareaEl = wrapper.createEl("textarea", {
-			cls: "arcana-chat-textarea",
 			attr: {
-				placeholder: "Ask Arcana anything…",
-				rows: "1",
+				placeholder: "Ask anything...",
+				rows: "2",
 			},
 		});
 
 		this.textareaEl.addEventListener("keydown", (e: KeyboardEvent) => {
+			if (this.handleSlashKeydown(e)) return;
 			if (this.handleSuggestKeydown(e)) return;
 
 			if (e.key === "Enter" && !e.shiftKey) {
@@ -60,6 +68,7 @@ export class ChatInput {
 
 		this.textareaEl.addEventListener("input", () => {
 			this.autoResize();
+			this.checkSlashTrigger();
 			this.checkMentionTrigger();
 			this.onInputChange(this.textareaEl.value);
 		});
@@ -228,6 +237,122 @@ export class ChatInput {
 		if (e.key === "Escape") {
 			e.preventDefault();
 			this.hideSuggestions();
+			return true;
+		}
+
+		return false;
+	}
+
+	// ---- Slash Command Autocomplete ----
+
+	private checkSlashTrigger(): void {
+		const text = this.textareaEl.value;
+		const pos = this.textareaEl.selectionStart;
+		const beforeCursor = text.slice(0, pos);
+
+		if (this.suggestions.length > 0) return;
+
+		const slashMatch = beforeCursor.match(/^\/(\w*)$/);
+		if (!slashMatch) {
+			this.hideSlashSuggestions();
+			return;
+		}
+
+		const query = slashMatch[1];
+		this.showSlashSuggestions(query);
+	}
+
+	private showSlashSuggestions(query: string): void {
+		this.slashSuggestions = filterCommands(query);
+		if (this.slashSuggestions.length === 0) {
+			this.hideSlashSuggestions();
+			return;
+		}
+
+		this.slashSuggestEl.empty();
+		this.slashSuggestEl.style.display = "";
+		this.activeSlashIndex = -1;
+
+		for (let i = 0; i < this.slashSuggestions.length; i++) {
+			const cmd = this.slashSuggestions[i];
+			const item = this.slashSuggestEl.createDiv({ cls: "arcana-slash-item" });
+
+			const iconEl = item.createSpan({ cls: "arcana-slash-icon" });
+			setIcon(iconEl, cmd.icon);
+
+			const textEl = item.createDiv({ cls: "arcana-slash-text" });
+			textEl.createSpan({ text: `/${cmd.name}`, cls: "arcana-slash-name" });
+			textEl.createSpan({ text: cmd.description, cls: "arcana-slash-desc" });
+
+			item.addEventListener("click", () => this.acceptSlashSuggestion(i));
+			item.addEventListener("mouseenter", () => this.setActiveSlash(i));
+		}
+	}
+
+	private hideSlashSuggestions(): void {
+		this.slashSuggestEl.style.display = "none";
+		this.slashSuggestEl.empty();
+		this.slashSuggestions = [];
+		this.activeSlashIndex = -1;
+	}
+
+	private setActiveSlash(index: number): void {
+		const items = this.slashSuggestEl.querySelectorAll(".arcana-slash-item");
+		items.forEach((el) => el.removeClass("is-selected"));
+		this.activeSlashIndex = index;
+		if (index >= 0 && index < items.length) {
+			items[index].addClass("is-selected");
+		}
+	}
+
+	private acceptSlashSuggestion(index: number): void {
+		const cmd = this.slashSuggestions[index];
+		if (!cmd) return;
+
+		this.textareaEl.value = `/${cmd.name} `;
+		const newPos = this.textareaEl.value.length;
+		this.textareaEl.selectionStart = newPos;
+		this.textareaEl.selectionEnd = newPos;
+
+		this.hideSlashSuggestions();
+		this.textareaEl.focus();
+		this.autoResize();
+		this.onInputChange(this.textareaEl.value);
+	}
+
+	private handleSlashKeydown(e: KeyboardEvent): boolean {
+		if (this.slashSuggestions.length === 0) return false;
+
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			const next = Math.min(this.activeSlashIndex + 1, this.slashSuggestions.length - 1);
+			this.setActiveSlash(next);
+			return true;
+		}
+
+		if (e.key === "ArrowUp") {
+			e.preventDefault();
+			const prev = Math.max(this.activeSlashIndex - 1, 0);
+			this.setActiveSlash(prev);
+			return true;
+		}
+
+		if (e.key === "Enter" || e.key === "Tab") {
+			if (this.activeSlashIndex >= 0) {
+				e.preventDefault();
+				this.acceptSlashSuggestion(this.activeSlashIndex);
+				return true;
+			}
+			if (e.key === "Tab" && this.slashSuggestions.length > 0) {
+				e.preventDefault();
+				this.acceptSlashSuggestion(0);
+				return true;
+			}
+		}
+
+		if (e.key === "Escape") {
+			e.preventDefault();
+			this.hideSlashSuggestions();
 			return true;
 		}
 
