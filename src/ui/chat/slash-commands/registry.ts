@@ -11,7 +11,7 @@ import { worktogetherCommand } from "./commands/worktogether";
 import { dumpCommand } from "./commands/dump";
 import { eveningCommand } from "./commands/evening";
 
-const ALL_COMMANDS: SlashCommand[] = [
+const BUILT_IN_COMMANDS: SlashCommand[] = [
 	taskCommand,
 	summarizeCommand,
 	findCommand,
@@ -26,8 +26,32 @@ const ALL_COMMANDS: SlashCommand[] = [
 ];
 
 const commandMap = new Map<string, SlashCommand>();
-for (const cmd of ALL_COMMANDS) {
+for (const cmd of BUILT_IN_COMMANDS) {
 	commandMap.set(cmd.name, cmd);
+}
+
+export function registerCommand(cmd: SlashCommand): void {
+	commandMap.set(cmd.name, cmd);
+}
+
+export function registerCommands(cmds: SlashCommand[]): void {
+	for (const cmd of cmds) {
+		commandMap.set(cmd.name, cmd);
+	}
+}
+
+export function unregisterCommand(name: string): void {
+	if (BUILT_IN_COMMANDS.some((c) => c.name === name)) return;
+	commandMap.delete(name);
+}
+
+export function clearCustomCommands(): void {
+	const builtInNames = new Set(BUILT_IN_COMMANDS.map((c) => c.name));
+	for (const name of [...commandMap.keys()]) {
+		if (!builtInNames.has(name)) {
+			commandMap.delete(name);
+		}
+	}
 }
 
 export function getCommand(name: string): SlashCommand | undefined {
@@ -35,13 +59,14 @@ export function getCommand(name: string): SlashCommand | undefined {
 }
 
 export function getAllCommands(): SlashCommand[] {
-	return ALL_COMMANDS;
+	return [...commandMap.values()];
 }
 
 export function filterCommands(query: string): SlashCommand[] {
-	if (!query) return ALL_COMMANDS;
+	const all = getAllCommands();
+	if (!query) return all;
 	const q = query.toLowerCase();
-	return ALL_COMMANDS.filter(
+	return all.filter(
 		(c) =>
 			c.name.includes(q) ||
 			c.description.toLowerCase().includes(q),

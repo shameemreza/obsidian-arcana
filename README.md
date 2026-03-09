@@ -158,7 +158,120 @@ Pulls together your day:
 2. What's still open.
 3. Asks what went well and what your top priority is for tomorrow.
 
-Saves the review to your daily note, creating one if needed. Will pair with a future `/morning` command for a full daily cycle.
+Saves the review to your daily note, creating one if needed. Pairs with `/morning` for a full daily cycle.
+
+### Custom Commands (Agent Skills)
+
+Create your own slash commands as markdown files in `.arcana/commands/`. Each file defines a goal, available tools, and instructions. The AI acts as a lightweight agent that decides which tools to call, gathers data, and produces a final result.
+
+#### Getting started
+
+The `.arcana` folder is hidden by default in Obsidian's file explorer — Obsidian hides all dot-prefixed folders, just like the `.obsidian` configuration folder. The official docs explain how to find it: [Configuration folder](https://help.obsidian.md/configuration-folder) and [Vault settings](https://help.obsidian.md/data-storage#Vault+settings).
+
+To access `.arcana/commands/`:
+
+1. Open your vault folder in your OS file manager (Finder, Explorer, etc.).
+2. Show hidden files:
+   - **macOS**: press `Cmd+Shift+.` in Finder.
+   - **Windows**: enable **Hidden items** in the Explorer View menu.
+   - **Linux**: press `Ctrl+H` or enable hidden files in your file manager.
+3. Navigate to `.arcana/commands/` and create or edit `.md` files there.
+
+You can also open the folder from the terminal:
+
+```bash
+cd /path/to/your/vault/.arcana/commands
+open .    # macOS
+start .   # Windows
+xdg-open . # Linux
+```
+
+**Tip**: The community plugin [Show Hidden Files](https://github.com/polyipseity/obsidian-show-hidden-files) makes dotfolders like `.arcana` visible directly in Obsidian's file explorer so you can edit command files without leaving the app.
+
+Once you add or edit a `.md` file in `.arcana/commands/`, Arcana picks it up automatically and the new `/command` appears in the slash menu. No restart needed.
+
+#### File format
+
+```markdown
+---
+name: morning
+description: Morning briefing with tasks and priorities
+icon: sunrise
+output: chat
+output_folder: Daily Notes
+tools:
+  - name: open_tasks
+    source: vault
+    description: Search for open tasks in the vault.
+  - name: daily_note
+    source: note
+    description: Read today's daily note.
+  - name: project_notes
+    source: folder
+    description: Read notes from a folder.
+---
+
+You are a morning briefing assistant.
+
+Use the available tools to understand what's on the user's plate today.
+Write a brief, energizing morning briefing covering:
+
+1. Today's tasks sorted by priority.
+2. Overdue items flagged clearly.
+3. Suggested focus for the day.
+
+If a tool returns nothing, skip that section and work with what you have.
+```
+
+#### Frontmatter fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | The slash command name. Users type `/name` in chat. |
+| `description` | No | Shown in the autocomplete dropdown. Defaults to "Custom command: name". |
+| `icon` | No | A [Lucide](https://lucide.dev/icons/) icon name (up to v0.446.0). Defaults to `terminal`. |
+| `output` | No | Where the result goes: `chat` (default), `note` (creates a new note), or `both`. |
+| `output_folder` | No | Target folder when output includes `note`. |
+| `tools` | No | List of tools the AI can call. See below. |
+
+#### Tool sources
+
+| Source | Input | What it does |
+|--------|-------|-------------|
+| `vault` | `query` | Keyword search across the entire vault. Returns matching notes with excerpts. |
+| `note` | `name` | Read a specific note by name or path. |
+| `folder` | `folder` | Read all markdown files in a folder. |
+| `mcp` | — | Call an MCP server tool. Not available yet — coming in a future update. |
+
+Each tool needs a `name`, `source`, and `description`. The description helps the AI understand when to use it.
+
+#### How it works
+
+1. User types `/morning` in chat.
+2. Arcana loads the command file and parses frontmatter + instructions.
+3. The AI receives the instructions and a list of available tools.
+4. The AI decides which tools to call and in what order (agent loop).
+5. Tool results feed back into the AI context for reasoning.
+6. The AI produces the final output.
+7. Output is routed to chat, a new note, or both based on the `output` field.
+
+The agent loop runs up to 6 iterations. If a tool fails or returns nothing, the AI skips it and works with what it has.
+
+#### Icons
+
+Obsidian ships Lucide icons up to **v0.446.0**. Browse the full set at [lucide.dev/icons](https://lucide.dev/icons/). Some good picks for commands:
+
+`sunrise` `moon` `lightbulb` `calendar-check` `brain` `search` `terminal` `zap` `list-checks` `pen-line` `sparkles` `clipboard-list` `compass` `rocket` `target` `book-open` `git-branch` `database` `cpu` `shield`
+
+#### Shipped examples
+
+Arcana creates three example commands on first run:
+
+- **`/morning`** — Morning briefing with tasks and priorities.
+- **`/weekly-review`** — Weekly review saved as a note.
+- **`/brainstorm`** — Brainstorm ideas using vault context.
+
+Edit or delete these to make them your own.
 
 ### AI Providers
 
@@ -241,6 +354,11 @@ Open via **Settings > Community plugins > Arcana**.
 - **Streak tracking** for daily task completion with configurable grace days.
 - **Notification level** from none to verbose, with an ADHD-friendly minimal option.
 
+### Custom Commands
+
+- Shows how many custom commands are loaded and their names.
+- See [Custom Commands (Agent Skills)](#custom-commands-agent-skills) above for how to create and edit commands.
+
 ### Privacy
 
 - **Context scope** setting the default mode (note, folder, vault).
@@ -249,7 +367,7 @@ Open via **Settings > Community plugins > Arcana**.
 
 ## Icons
 
-Arcana uses Lucide icons, which ship with Obsidian as the built-in icon set. No external icon dependencies are needed. All icons (sparkles, send, copy, file-plus, timer, moon, brain, and others) come from the `setIcon()` API provided by Obsidian.
+Arcana uses Lucide icons, which ship with Obsidian as the built-in icon set (up to v0.446.0). No external icon dependencies are needed. Browse the full icon set at [lucide.dev/icons](https://lucide.dev/icons/). All icons come from the `setIcon()` API provided by Obsidian.
 
 ## Installation
 
@@ -290,6 +408,11 @@ src/
 │   │       ├── gemini.ts           # Gemini REST API.
 │   │       └── ollama.ts           # Local Ollama.
 │   ├── chat-history.ts             # Conversation persistence as markdown files.
+│   ├── commands/
+│   │   ├── types.ts                # CustomCommand, ToolDefinition types.
+│   │   ├── skill-loader.ts         # Scan .arcana/commands/, parse YAML.
+│   │   ├── skill-runner.ts         # Agent loop with tool-calling.
+│   │   └── vault-tools.ts          # Vault/note/folder tool implementations.
 │   └── vault/
 │       ├── vault-intel.ts          # Vault scanning and intelligence.
 │       ├── note-creator.ts         # Note and task creation.
@@ -303,7 +426,7 @@ src/
 │       ├── ConversationPicker.ts   # History browser modal with delete.
 │       └── slash-commands/
 │           ├── types.ts            # Command interface.
-│           ├── registry.ts         # Command registry and parser.
+│           ├── registry.ts         # Command registry with dynamic registration.
 │           └── commands/
 │               ├── task.ts         # /task
 │               ├── summarize.ts    # /summarize

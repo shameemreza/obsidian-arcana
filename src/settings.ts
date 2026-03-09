@@ -319,6 +319,43 @@ export class ArcanaSettingTab extends PluginSettingTab {
 					})
 			);
 
+		// --- Custom Commands ---
+		new Setting(containerEl).setName("Custom commands").setHeading();
+
+		const cmdDesc = containerEl.createDiv({ cls: "setting-item-description" });
+		cmdDesc.style.marginBottom = "1em";
+		cmdDesc.innerHTML =
+			"Create your own slash commands as markdown files in <code>.arcana/commands/</code>. " +
+			"Each file defines a goal, tools, and instructions. The AI acts as an agent " +
+			"that reasons about which tools to call and produces a final result.";
+
+		const stepsEl = containerEl.createDiv({ cls: "setting-item-description" });
+		stepsEl.style.marginBottom = "1em";
+		stepsEl.innerHTML = [
+			"<strong>How to add a custom command:</strong>",
+			"<ol style='margin:0.5em 0 0.5em 1.2em;padding:0;'>",
+			"<li>Open your vault folder in your OS file manager (Finder, Explorer, etc.).</li>",
+			"<li>Show hidden files — on macOS press <code>Cmd+Shift+.</code>, " +
+			"on Windows enable <strong>Hidden items</strong> in the View menu.</li>",
+			"<li>Navigate to <code>.arcana/commands/</code> inside your vault.</li>",
+			"<li>Create a new <code>.md</code> file (or copy one of the examples).</li>",
+			"<li>Add YAML frontmatter with <code>name</code>, <code>description</code>, " +
+			"<code>icon</code>, <code>output</code>, and <code>tools</code>, " +
+			"then write your instructions below the frontmatter.</li>",
+			"<li>Save the file. Arcana picks it up automatically and the new " +
+			"<code>/command</code> appears in the slash menu.</li>",
+			"</ol>",
+			'This is the same process as accessing the <code>.obsidian</code> folder. ' +
+			'See <a href="https://help.obsidian.md/configuration-folder">Configuration folder</a> ' +
+			"in the Obsidian docs for more details.<br><br>" +
+			'<strong>Tip:</strong> The community plugin ' +
+			'<a href="https://github.com/polyipseity/obsidian-show-hidden-files">Show Hidden Files</a> ' +
+			"makes dotfolders like <code>.arcana</code> visible directly in Obsidian's file explorer.",
+		].join("");
+
+		const commandCountEl = containerEl.createDiv({ cls: "arcana-settings-commands-empty" });
+		this.renderCommandCount(commandCountEl);
+
 		// --- Tasks ---
 		new Setting(containerEl).setName("Tasks").setHeading();
 
@@ -510,5 +547,21 @@ export class ArcanaSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+	}
+
+	private async renderCommandCount(el: HTMLElement): Promise<void> {
+		try {
+			const commands = await this.plugin.skillLoader.loadAll();
+			if (commands.length === 0) {
+				el.setText(
+					"No custom commands found. Add .md files to .arcana/commands/ to create them.",
+				);
+			} else {
+				const names = commands.map((c) => `/${c.name}`).join(", ");
+				el.setText(`${commands.length} command(s) loaded: ${names}`);
+			}
+		} catch {
+			el.setText("No custom commands found. Add .md files to .arcana/commands/ to create them.");
+		}
 	}
 }

@@ -650,3 +650,24 @@
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 }
+
+/* ============================================================
+   Settings — Custom Commands List
+   ============================================================ */
+
+.arcana-settings-command-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-bottom: var(--size-4-3);
+}
+
+.arcana-settings-commands-empty {
+	padding: var(--size-4-3);
+	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	background: var(--background-secondary);
+	border-radius: var(--radius-s);
+}
+

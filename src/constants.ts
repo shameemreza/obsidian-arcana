@@ -7,6 +7,7 @@ export const VIEW_TYPE_DAY_PLANNER = "arcana-day-planner";
 
 export const DEFAULT_TASK_FOLDER = "Tasks";
 export const DEFAULT_CHAT_HISTORY_PATH = ".arcana/chats";
+export const DEFAULT_COMMANDS_PATH = ".arcana/commands";
 export const DEFAULT_DAILY_NOTE_FOLDER = "Daily Notes";
 export const DEFAULT_WEEKLY_NOTE_FOLDER = "Weekly Notes";
 export const DEFAULT_MONTHLY_NOTE_FOLDER = "Monthly Notes";
