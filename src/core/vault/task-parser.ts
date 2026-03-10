@@ -60,7 +60,8 @@ export class TaskParser {
 			'  "priority": "urgent|high|medium|low|none",',
 			'  "tags": ["tag1", "tag2"],',
 			'  "context": "project or area name, or null",',
-			'  "time_estimate": minutes as number or null',
+			'  "time_estimate": minutes as number or null,',
+			'  "difficulty": "easy|medium|hard (based on task complexity)"',
 			'}',
 		].join("\n");
 
@@ -88,9 +89,54 @@ export class TaskParser {
 				...(typeof json.time_estimate === "number"
 					? { time_estimate: json.time_estimate }
 					: {}),
+				...(validDifficulty(json.difficulty)
+					? { difficulty: json.difficulty as "easy" | "medium" | "hard" }
+					: {}),
 			};
 		} catch {
 			return this.parse(input);
+		}
+	}
+
+	/**
+	 * Use AI to classify a task's difficulty based on its title and notes.
+	 * Returns null if AI is unavailable or classification fails.
+	 */
+	async suggestDifficulty(
+		title: string,
+		notes?: string,
+	): Promise<"easy" | "medium" | "hard" | null> {
+		const provider = this.aiEngine.getActiveProvider();
+		if (!provider.isConfigured()) return null;
+
+		const context = notes
+			? `Title: ${title}\nNotes: ${notes.slice(0, 500)}`
+			: `Title: ${title}`;
+
+		const prompt = [
+			"Classify this task's difficulty. Respond with ONLY one word: easy, medium, or hard.",
+			"",
+			"- easy: quick, routine, single-step, under 15 minutes",
+			"- medium: some thought required, multiple steps, 15-60 minutes",
+			"- hard: complex, research needed, many steps, over 60 minutes",
+			"",
+			context,
+		].join("\n");
+
+		try {
+			const response = await this.aiEngine.chatComplete(
+				[{ role: "user", content: prompt, timestamp: Date.now() }],
+				{ temperature: 0, maxTokens: 10 },
+			);
+
+			const cleaned = response.trim().toLowerCase();
+			if (cleaned === "easy" || cleaned === "medium" || cleaned === "hard") {
+				return cleaned;
+			}
+			const match = cleaned.match(/\b(easy|medium|hard)\b/);
+			return match ? (match[1] as "easy" | "medium" | "hard") : null;
+		} catch {
+			return null;
 		}
 	}
 }
@@ -252,4 +298,10 @@ function validPriority(value: unknown): TaskPriority | null {
 		return value as TaskPriority;
 	}
 	return null;
+}
+
+const VALID_DIFFICULTIES = new Set(["easy", "medium", "hard"]);
+
+function validDifficulty(value: unknown): boolean {
+	return typeof value === "string" && VALID_DIFFICULTIES.has(value);
 }

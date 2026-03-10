@@ -1,5 +1,6 @@
 import { Notice, Plugin, TFile, normalizePath } from "obsidian";
 import { ArcanaSettingTab, DEFAULT_SETTINGS } from "./settings";
+import { parseTimeEstimate, formatTimeEstimate } from "./utils/frontmatter";
 import type { ArcanaSettings } from "./settings";
 import { AIEngine } from "./core/ai/ai-engine";
 import { VaultIntel } from "./core/vault/vault-intel";
@@ -8,6 +9,8 @@ import { TaskParser, extractTasksFromContent } from "./core/vault/task-parser";
 import { TaskScanner } from "./core/vault/task-scanner";
 import { TaskLifecycle } from "./core/vault/task-lifecycle";
 import { TaskChunking } from "./core/vault/task-chunking";
+import { FocusTracker } from "./core/vault/focus-tracker";
+import { addEstimationRecord } from "./core/vault/estimation-tracker";
 import { ChatHistory } from "./core/chat-history";
 import { SkillLoader } from "./core/commands/skill-loader";
 import { SkillRunner } from "./core/commands/skill-runner";
@@ -15,6 +18,7 @@ import { ChatView } from "./ui/chat/ChatView";
 import { TaskModal } from "./ui/tasks/TaskModal";
 import { QuickTaskModal } from "./ui/tasks/QuickTaskModal";
 import { ExtractTasksModal } from "./ui/tasks/ExtractTasksModal";
+import { ActualTimeModal } from "./ui/tasks/ActualTimeModal";
 import { VIEW_TYPE_CHAT, DEFAULT_COMMANDS_PATH } from "./constants";
 import {
 	registerCommands,
@@ -32,6 +36,7 @@ export default class ArcanaPlugin extends Plugin {
 	taskScanner!: TaskScanner;
 	taskLifecycle!: TaskLifecycle;
 	taskChunking!: TaskChunking;
+	focusTracker!: FocusTracker;
 	chatHistory!: ChatHistory;
 	skillLoader!: SkillLoader;
 	skillRunner!: SkillRunner;
@@ -58,6 +63,7 @@ export default class ArcanaPlugin extends Plugin {
 			() => this.settings,
 		);
 		this.taskLifecycle.setTaskChunking(this.taskChunking);
+		this.focusTracker = new FocusTracker();
 		this.chatHistory = new ChatHistory(
 			this.app,
 			() => this.settings,
@@ -164,7 +170,7 @@ export default class ArcanaPlugin extends Plugin {
 			parent_task: "text",
 			subtask_progress: "text",
 			time_estimate: "text",
-			actual_time: "number",
+			actual_time: "text",
 			status: "text",
 			priority: "text",
 			context: "text",
@@ -271,11 +277,17 @@ export default class ArcanaPlugin extends Plugin {
 	}
 
 	private openTaskModal(): void {
+		const aiConfigured = this.aiEngine.getActiveProvider().isConfigured();
 		new TaskModal(this.app, {
 			noteCreator: this.noteCreator,
 			taskFolder: this.settings.taskFolderPath,
 			defaultStatus: this.settings.defaultTaskStatus,
 			defaultPriority: this.settings.defaultTaskPriority,
+			estimationData: this.settings.timeEstimationTraining
+				? this.settings.estimationData
+				: undefined,
+			autoAdjustEstimates: this.settings.autoAdjustEstimates,
+			taskParser: aiConfigured ? this.taskParser : undefined,
 		}).open();
 	}
 
@@ -297,6 +309,17 @@ export default class ArcanaPlugin extends Plugin {
 			return;
 		}
 
+		const title = cache?.frontmatter?.title ?? file.basename;
+		const estimate = parseTimeEstimate(
+			cache?.frontmatter?.time_estimate,
+		);
+		const rawDifficulty = cache?.frontmatter?.difficulty;
+		const difficulty =
+			typeof rawDifficulty === "string" &&
+			["easy", "medium", "hard"].includes(rawDifficulty)
+				? (rawDifficulty as "easy" | "medium" | "hard")
+				: undefined;
+
 		const deps = await this.taskLifecycle.checkDependencies(file);
 		if (!deps.met) {
 			const names = deps.pending
@@ -309,12 +332,83 @@ export default class ArcanaPlugin extends Plugin {
 
 		try {
 			await this.taskLifecycle.completeTask(file);
-			const title = cache?.frontmatter?.title ?? file.basename;
 			new Notice(`Task completed: ${title}`);
+			this.showTaskCompletionAnimation();
+
+			if (this.settings.timeEstimationTraining) {
+				await this.delay(800);
+				await this.promptActualTime(
+					file,
+					title,
+					estimate,
+					difficulty,
+				);
+			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			new Notice(`Failed to complete task: ${msg}`);
 		}
+	}
+
+	private async promptActualTime(
+		file: TFile,
+		title: string,
+		estimate: number | null,
+		difficulty: "easy" | "medium" | "hard" | undefined,
+	): Promise<void> {
+		const focusMinutes = this.focusTracker.getElapsedMinutes(file.path);
+		const modal = new ActualTimeModal(this.app, title, focusMinutes);
+		const actualMinutes = await modal.prompt();
+
+		if (actualMinutes != null) {
+			const formattedActual = formatTimeEstimate(actualMinutes);
+			await this.app.fileManager.processFrontMatter(file, (fm) => {
+				fm.actual_time = formattedActual;
+			});
+
+			await this.recordEstimationAccuracy(
+				estimate,
+				actualMinutes,
+				difficulty,
+			);
+		}
+
+		this.focusTracker.clear(file.path);
+	}
+
+	private async recordEstimationAccuracy(
+		estimate: number | null,
+		actual: number,
+		difficulty?: "easy" | "medium" | "hard",
+	): Promise<void> {
+		if (estimate == null || estimate <= 0) return;
+
+		this.settings.estimationData = addEstimationRecord(
+			this.settings.estimationData,
+			estimate,
+			actual,
+			difficulty,
+		);
+		await this.saveSettings();
+	}
+
+	private showTaskCompletionAnimation(): void {
+		const overlay = document.createElement("div");
+		overlay.addClass("arcana-subtask-complete-overlay");
+
+		const checkmark = document.createElement("div");
+		checkmark.addClass("arcana-subtask-complete-checkmark");
+		overlay.appendChild(checkmark);
+
+		document.body.appendChild(overlay);
+
+		window.setTimeout(() => {
+			overlay.remove();
+		}, 1200);
+	}
+
+	private delay(ms: number): Promise<void> {
+		return new Promise((resolve) => window.setTimeout(resolve, ms));
 	}
 
 	private async extractTasksFromActiveNote(file: TFile): Promise<void> {

@@ -111,7 +111,7 @@ AI builds a complete Obsidian note template with YAML frontmatter, headings, pla
 /focus 30
 ```
 
-Starts a countdown in the chat. Uses your configured work duration by default, or pass a number to set custom minutes. Shows a live timer that updates every second and tells you when time is up.
+Starts a countdown in the chat. Uses your configured work duration by default, or pass a number to set custom minutes. Shows a live timer that updates every second. When time is up, fires an Obsidian Notice and a brief visual animation. The elapsed time is tracked per file so it can pre-fill the actual time prompt when you complete the task.
 
 #### `/next` - Get your next task
 
@@ -319,7 +319,8 @@ due: 2026-03-14
 tags:
   - work
   - vendors
-context: Q3 review
+context: Personal
+difficulty: medium
 time_estimate: 30 min
 ---
 ```
@@ -328,11 +329,25 @@ Statuses: `inbox`, `todo`, `doing`, `waiting`, `done`, `cancelled`.
 
 Priorities: `urgent`, `high`, `medium`, `low`, `none`.
 
+Difficulty: `easy`, `medium`, `hard`. When AI is configured, difficulty is auto-classified on task creation based on the title and notes. The AI overrides any manually selected value, so you always get an accurate assessment. Classification criteria: easy (quick, routine, under 15 min), medium (some thought, 15-60 min), hard (complex, research needed, over 60 min).
+
 Natural language input supports tags (`#work`), priority markers (`priority:high`, `!!!`, `ASAP`), and due dates (`by Friday`, `due next Monday`, `before March 15`, `in 3 days`).
 
-#### Time estimates
+#### Folder placement
+
+The task creation modal has a **Folder** field that lets you choose a subfolder inside your task folder. Type a name like `Personal` or `Work/Q3` and the task is created in `Tasks/Personal/` or `Tasks/Work/Q3/`. The folder is created automatically if it does not exist. A hint below the field shows the resolved path. Leave it empty to use the default task folder.
+
+#### Completion feedback
+
+Completing a task via the command palette shows a brief green checkmark animation as positive feedback, followed by the actual time prompt (if estimation training is enabled). The `/focus` timer also fires a visual animation and an Obsidian Notice when the session ends.
+
+#### Time estimates and estimation training
 
 Time estimates are stored with human-readable units: `10 min`, `1 hr`, `1 hr 30 min`, `1 day`. When you enter a number in the task modal, it is treated as minutes and formatted automatically. Legacy bare numbers (like `30`) are still read correctly.
+
+When **Time estimation training** is enabled in settings, completing a task prompts you for how long it actually took. If you used the `/focus` timer on that task, the elapsed time is pre-filled. Over time, Arcana builds a picture of your estimation accuracy and shows insights like "You usually underestimate by about 40%." when you enter an estimate on a new task.
+
+With **Auto-adjust estimates** enabled, Arcana also shows an adjusted estimate alongside your original, calibrated to your historical accuracy. Insights can be broken down by difficulty level when enough data exists.
 
 #### Task chunking and subtasks
 
@@ -358,7 +373,7 @@ Run **Generate task views** from the command palette to create `.base` files for
 
 #### Property types
 
-Arcana registers frontmatter property types on load so Obsidian displays the correct icons in the Properties panel. Fields like `parent_task`, `subtask_progress`, `status`, `priority`, `context`, and `time_estimate` all get proper type indicators instead of the default question mark.
+Arcana registers frontmatter property types on load so Obsidian displays the correct icons in the Properties panel. Fields like `parent_task`, `subtask_progress`, `status`, `priority`, `context`, `difficulty`, `time_estimate`, and `actual_time` all get proper type indicators instead of the default question mark.
 
 ## Settings
 
@@ -389,6 +404,8 @@ Open via **Settings > Community plugins > Arcana**.
 
 - **Chronotype** setting (morning lark, neutral, night owl) that shapes `/next` recommendations.
 - **Focus work and break duration** for timer presets.
+- **Time estimation training** to prompt for actual time on task completion and build accuracy history.
+- **Auto-adjust estimates** to show calibrated estimates based on your track record.
 - **Flow protection** to defer break notifications while you are actively typing.
 - **Body double check-in interval** controlling how often `/worktogether` checks in (default: 15 min).
 - **Streak tracking** for daily task completion with configurable grace days.
@@ -460,6 +477,8 @@ src/
 │       ├── task-scanner.ts         # Task discovery and indexing.
 │       ├── task-lifecycle.ts       # Status changes, completion, recurrence.
 │       ├── task-chunking.ts        # AI subtask generation and progress.
+│       ├── estimation-tracker.ts   # Time estimation accuracy tracking.
+│       ├── focus-tracker.ts        # Focus session elapsed time per file.
 │       └── recurrence.ts           # Recurring task date computation.
 ├── ui/
 │   ├── chat/
@@ -487,6 +506,7 @@ src/
 │   └── tasks/
 │       ├── TaskModal.ts            # Full task creation/edit modal.
 │       ├── QuickTaskModal.ts       # Quick capture modal.
+│       ├── ActualTimeModal.ts      # Post-completion actual time prompt.
 │       └── ExtractTasksModal.ts    # Extract tasks from note content.
 └── utils/
     ├── dates.ts                    # Natural language date parsing.

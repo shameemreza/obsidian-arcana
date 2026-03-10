@@ -142,7 +142,9 @@ export class TaskScanner {
 			...(parseTimeEstimate(fm.time_estimate) != null
 				? { time_estimate: parseTimeEstimate(fm.time_estimate) as number }
 				: {}),
-			...(typeof fm.actual_time === "number" ? { actual_time: fm.actual_time } : {}),
+			...(parseTimeEstimate(fm.actual_time) != null
+				? { actual_time: parseTimeEstimate(fm.actual_time) as number }
+				: {}),
 			...(typeof fm.difficulty === "string" &&
 				["easy", "medium", "hard"].includes(fm.difficulty)
 				? { difficulty: fm.difficulty as "easy" | "medium" | "hard" }

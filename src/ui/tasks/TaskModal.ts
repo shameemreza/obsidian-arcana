@@ -2,8 +2,11 @@ import { App, Modal, Notice, Setting, TFile } from "obsidian";
 import type { TaskFrontmatter, TaskStatus, TaskPriority } from "../../types";
 import { TASK_STATUSES, TASK_PRIORITIES } from "../../constants";
 import { parseNaturalDate, formatRelativeDate, todayISO } from "../../utils/dates";
-import { buildTaskNote } from "../../utils/frontmatter";
+import { buildTaskNote, formatTimeEstimate } from "../../utils/frontmatter";
 import type { NoteCreator } from "../../core/vault/note-creator";
+import type { TaskParser } from "../../core/vault/task-parser";
+import type { EstimationData } from "../../core/vault/estimation-tracker";
+import { getEstimationInsight, adjustEstimate } from "../../core/vault/estimation-tracker";
 
 interface TaskModalOptions {
 	noteCreator: NoteCreator;
@@ -11,6 +14,9 @@ interface TaskModalOptions {
 	defaultStatus: string;
 	defaultPriority: string;
 	existing?: { file: TFile; frontmatter: TaskFrontmatter };
+	estimationData?: EstimationData;
+	autoAdjustEstimates?: boolean;
+	taskParser?: TaskParser;
 }
 
 /**
@@ -26,12 +32,14 @@ export class TaskModal extends Modal {
 	private scheduledRaw = "";
 	private scheduledParsed: string | null = null;
 	private tags = "";
-	private context = "";
+	private folder = "";
 	private timeEstimate = "";
+	private difficulty: "easy" | "medium" | "hard" | "" = "";
 	private notes = "";
 
 	private isEditing: boolean;
 	private options: TaskModalOptions;
+	private insightEl: HTMLElement | null = null;
 
 	constructor(app: App, options: TaskModalOptions) {
 		super(app);
@@ -48,8 +56,9 @@ export class TaskModal extends Modal {
 			this.scheduledRaw = fm.scheduled ?? "";
 			this.scheduledParsed = fm.scheduled ?? null;
 			this.tags = fm.tags?.join(", ") ?? "";
-			this.context = fm.context ?? "";
+			this.folder = fm.context ?? "";
 			this.timeEstimate = fm.time_estimate != null ? String(fm.time_estimate) : "";
+			this.difficulty = fm.difficulty ?? "";
 		} else {
 			this.status = (options.defaultStatus as TaskStatus) ?? "inbox";
 			this.priority = (options.defaultPriority as TaskPriority) ?? "medium";
@@ -114,25 +123,55 @@ export class TaskModal extends Modal {
 					.onChange((v) => { this.tags = v; }),
 			);
 
+		const folderSetting = new Setting(contentEl)
+			.setName("Folder")
+			.setDesc("Subfolder inside the task folder (created if needed)");
+		folderSetting.addText((text) =>
+			text
+				.setPlaceholder("e.g. Personal, Work/Q3")
+				.setValue(this.folder)
+				.onChange((v) => {
+					this.folder = v;
+					this.updateFolderHint(folderHintEl);
+				}),
+		);
+		const folderHintEl = contentEl.createDiv({
+			cls: "arcana-folder-hint",
+		});
+		this.updateFolderHint(folderHintEl);
+
 		new Setting(contentEl)
-			.setName("Context")
-			.setDesc("Project or area name")
-			.addText((text) =>
-				text
-					.setPlaceholder("marketplace")
-					.setValue(this.context)
-					.onChange((v) => { this.context = v; }),
-			);
+			.setName("Difficulty")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("", "Not set")
+					.addOption("easy", "Easy")
+					.addOption("medium", "Medium")
+					.addOption("hard", "Hard")
+					.setValue(this.difficulty)
+					.onChange((v) => {
+						this.difficulty = v as typeof this.difficulty;
+						this.updateEstimationInsight();
+					});
+			});
 
 		new Setting(contentEl)
 			.setName("Time estimate")
-			.setDesc("Minutes")
+			.setDesc("How long do you think this will take? (minutes)")
 			.addText((text) =>
 				text
-					.setPlaceholder("30")
+					.setPlaceholder("e.g. 30")
 					.setValue(this.timeEstimate)
-					.onChange((v) => { this.timeEstimate = v; }),
+					.onChange((v) => {
+						this.timeEstimate = v;
+						this.updateEstimationInsight();
+					}),
 			);
+
+		this.insightEl = contentEl.createDiv({
+			cls: "arcana-estimation-insight",
+		});
+		this.updateEstimationInsight();
 
 		const notesWrapper = contentEl.createDiv({ cls: "arcana-task-notes-field" });
 		notesWrapper.createEl("label", {
@@ -164,6 +203,45 @@ export class TaskModal extends Modal {
 		this.contentEl.empty();
 	}
 
+	private resolveTaskFolder(): string {
+		const base = this.options.taskFolder;
+		const sub = this.folder.trim();
+		if (!sub) return base;
+		return `${base}/${sub}`;
+	}
+
+	private updateFolderHint(el: HTMLElement): void {
+		const resolved = this.resolveTaskFolder();
+		el.setText(`Task will be saved in: ${resolved}/`);
+	}
+
+	private updateEstimationInsight(): void {
+		if (!this.insightEl) return;
+		this.insightEl.empty();
+
+		const data = this.options.estimationData;
+		if (!data) return;
+
+		const est = parseInt(this.timeEstimate, 10);
+		if (!Number.isFinite(est) || est <= 0) return;
+
+		const diff = this.difficulty as "easy" | "medium" | "hard" | undefined;
+		const insight = getEstimationInsight(data, diff || undefined);
+		if (!insight) return;
+
+		this.insightEl.setText(insight.message);
+
+		if (this.options.autoAdjustEstimates) {
+			const adjusted = adjustEstimate(data, est, diff || undefined);
+			if (adjusted != null && adjusted !== est) {
+				const adjustedText = formatTimeEstimate(adjusted);
+				this.insightEl.setText(
+					`${insight.message} Adjusted estimate: ${adjustedText}`,
+				);
+			}
+		}
+	}
+
 	private addDateField(
 		container: HTMLElement,
 		label: string,
@@ -193,6 +271,16 @@ export class TaskModal extends Modal {
 			return;
 		}
 
+		if (this.options.taskParser) {
+			const suggested = await this.options.taskParser.suggestDifficulty(
+				this.title.trim(),
+				this.notes || undefined,
+			);
+			if (suggested) {
+				this.difficulty = suggested;
+			}
+		}
+
 		const tagList = this.tags
 			.split(",")
 			.map((t) => t.trim().replace(/^#/, ""))
@@ -210,8 +298,9 @@ export class TaskModal extends Modal {
 			...(this.dueParsed ? { due: this.dueParsed } : {}),
 			...(this.scheduledParsed ? { scheduled: this.scheduledParsed } : {}),
 			...(tagList.length > 0 ? { tags: tagList } : {}),
-			...(this.context.trim() ? { context: this.context.trim() } : {}),
+			...(this.folder.trim() ? { context: this.folder.trim() } : {}),
 			...(Number.isFinite(est) && est > 0 ? { time_estimate: est } : {}),
+			...(this.difficulty ? { difficulty: this.difficulty as "easy" | "medium" | "hard" } : {}),
 		};
 
 		try {
@@ -223,7 +312,7 @@ export class TaskModal extends Modal {
 				await this.options.noteCreator.createTask({
 					task,
 					body: this.notes || undefined,
-					taskFolder: this.options.taskFolder,
+					taskFolder: this.resolveTaskFolder(),
 					open: true,
 				});
 				new Notice(`Task created: ${task.title}`);

@@ -1,3 +1,4 @@
+import { Notice } from "obsidian";
 import type { SlashCommand, SlashCommandContext } from "../types";
 
 export const focusCommand: SlashCommand = {
@@ -19,6 +20,10 @@ export const focusCommand: SlashCommand = {
 		const file = ctx.plugin.app.workspace.getActiveFile();
 		const taskLabel = file ? `"${file.basename}"` : "your current task";
 
+		if (file) {
+			ctx.plugin.focusTracker.start(file.path);
+		}
+
 		const el = ctx.addAssistantMessage("", true);
 		const endTime = Date.now() + minutes * 60 * 1000;
 
@@ -36,7 +41,14 @@ export const focusCommand: SlashCommand = {
 			const remaining = endTime - Date.now();
 			if (remaining <= 0) {
 				window.clearInterval(interval);
+				if (file) {
+					ctx.plugin.focusTracker.stop(file.path);
+				}
 				ctx.finalizeStreaming(el, buildTimerComplete(taskLabel, minutes));
+				new Notice(
+					`Focus session complete! You worked ${minutes} minutes.`,
+				);
+				showTimerCompleteAnimation();
 				return;
 			}
 			ctx.updateStreaming(el, buildTimerMessage(taskLabel, minutes, formatTime(remaining), true));
@@ -65,4 +77,19 @@ function buildTimerComplete(taskLabel: string, minutes: number): string {
 		"",
 		"Time for a break. Stand up, stretch, get some water.",
 	].join("\n");
+}
+
+function showTimerCompleteAnimation(): void {
+	const overlay = document.createElement("div");
+	overlay.addClass("arcana-focus-complete-overlay");
+
+	const icon = document.createElement("div");
+	icon.addClass("arcana-focus-complete-icon");
+	overlay.appendChild(icon);
+
+	document.body.appendChild(overlay);
+
+	window.setTimeout(() => {
+		overlay.remove();
+	}, 1500);
 }

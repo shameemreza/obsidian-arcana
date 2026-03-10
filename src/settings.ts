@@ -24,6 +24,7 @@ import type {
 	FolderDecoration,
 	MCPServerConfig,
 } from "./types";
+import type { EstimationData } from "./core/vault/estimation-tracker";
 
 export interface ArcanaSettings {
 	// General
@@ -98,6 +99,9 @@ export interface ArcanaSettings {
 	contextScope: "note" | "folder" | "vault";
 	maxContextTokens: number;
 	chatHistoryPath: string;
+
+	// Estimation accuracy data (persisted)
+	estimationData: EstimationData;
 }
 
 export const DEFAULT_SETTINGS: ArcanaSettings = {
@@ -175,6 +179,9 @@ export const DEFAULT_SETTINGS: ArcanaSettings = {
 	contextScope: "note",
 	maxContextTokens: 4000,
 	chatHistoryPath: DEFAULT_CHAT_HISTORY_PATH,
+
+	// Estimation accuracy data
+	estimationData: { records: [] },
 };
 
 export class ArcanaSettingTab extends PluginSettingTab {
@@ -603,6 +610,52 @@ export class ArcanaSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Time estimation training")
+			.setDesc(
+				"Prompt for actual time spent when completing tasks. " +
+				"Builds a history of estimation accuracy over time.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.timeEstimationTraining)
+					.onChange(async (value) => {
+						this.plugin.settings.timeEstimationTraining = value;
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		if (this.plugin.settings.timeEstimationTraining) {
+			new Setting(containerEl)
+				.setName("Auto-adjust estimates")
+				.setDesc(
+					"Automatically adjust time estimates based on your " +
+					"historical accuracy. Shows adjusted value alongside " +
+					"your original estimate.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.autoAdjustEstimates)
+						.onChange(async (value) => {
+							this.plugin.settings.autoAdjustEstimates = value;
+							await this.plugin.saveSettings();
+						})
+				);
+
+			const recordCount = this.plugin.settings.estimationData.records.length;
+			if (recordCount > 0) {
+				const statsEl = containerEl.createDiv({
+					cls: "setting-item-description",
+				});
+				statsEl.setText(
+					`${recordCount} estimation record(s) stored. ` +
+					"This data is used to calibrate future estimates.",
+				);
+				statsEl.style.marginBottom = "1em";
+			}
+		}
 
 		new Setting(containerEl)
 			.setName("Streak tracking")

@@ -82,7 +82,8 @@ export function buildTaskNote(
 	if (task.context) fm.context = task.context;
 	if (task.time_estimate != null)
 		fm.time_estimate = formatTimeEstimate(task.time_estimate);
-	if (task.actual_time != null) fm.actual_time = task.actual_time;
+	if (task.actual_time != null)
+		fm.actual_time = formatTimeEstimate(task.actual_time);
 	if (task.difficulty) fm.difficulty = task.difficulty;
 	if (task.trigger) fm.trigger = task.trigger;
 	if (task.parent_task) fm.parent_task = task.parent_task;
