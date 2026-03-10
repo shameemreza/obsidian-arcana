@@ -168,6 +168,65 @@ function removeDatePhrases(text: string): string {
 	return result.trim();
 }
 
+export interface ExtractedActionItem {
+	title: string;
+	due?: string;
+	priority?: string;
+}
+
+/**
+ * Use AI to detect action items in arbitrary note content.
+ * Returns an empty array when AI is unavailable or nothing is found.
+ */
+export async function extractTasksFromContent(
+	aiEngine: AIEngine,
+	content: string,
+): Promise<ExtractedActionItem[]> {
+	const provider = aiEngine.getActiveProvider();
+	if (!provider.isConfigured()) return [];
+
+	const prompt = [
+		"Analyze the following note and extract every action item, task, or to-do.",
+		"For each one, provide a clear title, optional due date (YYYY-MM-DD), and priority.",
+		"",
+		"Respond with ONLY valid JSON (no markdown fences):",
+		'{ "tasks": [{ "title": "...", "due": "YYYY-MM-DD or null", "priority": "medium" }] }',
+		"",
+		'If no action items exist, respond: { "tasks": [] }',
+		"",
+		"Note content:",
+		'"""',
+		content.slice(0, 8000),
+		'"""',
+	].join("\n");
+
+	try {
+		const response = await aiEngine.chatComplete(
+			[{ role: "user", content: prompt, timestamp: Date.now() }],
+			{ temperature: 0.1, maxTokens: 1000 },
+		);
+
+		const json = extractJSON(response);
+		if (!json || !Array.isArray(json.tasks)) return [];
+
+		return (json.tasks as Record<string, unknown>[])
+			.filter(
+				(t) => typeof t.title === "string" && (t.title as string).trim(),
+			)
+			.map((t) => ({
+				title: t.title as string,
+				...(typeof t.due === "string" && t.due !== "null"
+					? { due: t.due }
+					: {}),
+				...(typeof t.priority === "string"
+					? { priority: t.priority }
+					: {}),
+			}));
+	} catch {
+		return [];
+	}
+}
+
 function extractJSON(
 	text: string,
 ): Record<string, unknown> | null {

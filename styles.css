@@ -785,3 +785,25 @@
 	margin-bottom: var(--size-4-2);
 }
 
+/* ============================================================
+   Extract Tasks Modal
+   ============================================================ */
+
+.arcana-extract-tasks-modal .arcana-extract-list {
+	max-height: 400px;
+	overflow-y: auto;
+	margin-bottom: var(--size-4-2);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	padding: var(--size-4-1);
+}
+
+.arcana-extract-tasks-modal .arcana-extract-list .setting-item {
+	border-bottom: 1px solid var(--background-modifier-border);
+	padding: var(--size-4-1) 0;
+}
+
+.arcana-extract-tasks-modal .arcana-extract-list .setting-item:last-child {
+	border-bottom: none;
+}
+

@@ -1,17 +1,19 @@
-import { Notice, Plugin, normalizePath } from "obsidian";
+import { Notice, Plugin, TFile, normalizePath } from "obsidian";
 import { ArcanaSettingTab, DEFAULT_SETTINGS } from "./settings";
 import type { ArcanaSettings } from "./settings";
 import { AIEngine } from "./core/ai/ai-engine";
 import { VaultIntel } from "./core/vault/vault-intel";
 import { NoteCreator } from "./core/vault/note-creator";
-import { TaskParser } from "./core/vault/task-parser";
+import { TaskParser, extractTasksFromContent } from "./core/vault/task-parser";
 import { TaskScanner } from "./core/vault/task-scanner";
+import { TaskLifecycle } from "./core/vault/task-lifecycle";
 import { ChatHistory } from "./core/chat-history";
 import { SkillLoader } from "./core/commands/skill-loader";
 import { SkillRunner } from "./core/commands/skill-runner";
 import { ChatView } from "./ui/chat/ChatView";
 import { TaskModal } from "./ui/tasks/TaskModal";
 import { QuickTaskModal } from "./ui/tasks/QuickTaskModal";
+import { ExtractTasksModal } from "./ui/tasks/ExtractTasksModal";
 import { VIEW_TYPE_CHAT, DEFAULT_COMMANDS_PATH } from "./constants";
 import {
 	registerCommands,
@@ -27,6 +29,7 @@ export default class ArcanaPlugin extends Plugin {
 	noteCreator!: NoteCreator;
 	taskParser!: TaskParser;
 	taskScanner!: TaskScanner;
+	taskLifecycle!: TaskLifecycle;
 	chatHistory!: ChatHistory;
 	skillLoader!: SkillLoader;
 	skillRunner!: SkillRunner;
@@ -39,6 +42,12 @@ export default class ArcanaPlugin extends Plugin {
 		this.noteCreator = new NoteCreator(this.app, this.vaultIntel);
 		this.taskParser = new TaskParser(this.aiEngine);
 		this.taskScanner = new TaskScanner(this.app, () => this.settings);
+		this.taskLifecycle = new TaskLifecycle(
+			this.app,
+			this.noteCreator,
+			this.taskScanner,
+			() => this.settings,
+		);
 		this.chatHistory = new ChatHistory(
 			this.app,
 			() => this.settings,
@@ -84,6 +93,30 @@ export default class ArcanaPlugin extends Plugin {
 			callback: () => this.generateTaskViews(),
 		});
 
+		this.addCommand({
+			id: "complete-task",
+			name: "Complete current task",
+			checkCallback: (checking) => {
+				const file = this.taskLifecycle.getActiveTaskFile();
+				if (!file) return false;
+				if (checking) return true;
+				this.completeCurrentTask(file);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "extract-tasks",
+			name: "Extract tasks from current note",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file || file.extension !== "md") return false;
+				if (checking) return true;
+				this.extractTasksFromActiveNote(file);
+				return true;
+			},
+		});
+
 		this.addSettingTab(new ArcanaSettingTab(this.app, this));
 
 		this.registerVaultEvents();
@@ -91,6 +124,7 @@ export default class ArcanaPlugin extends Plugin {
 
 		this.app.workspace.onLayoutReady(() => {
 			this.loadCustomCommands();
+			this.taskLifecycle.initializeStatusCache();
 		});
 	}
 
@@ -140,7 +174,12 @@ export default class ArcanaPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on("delete", invalidate));
 		this.registerEvent(this.app.vault.on("rename", invalidate));
 		this.registerEvent(
-			this.app.metadataCache.on("changed", invalidate),
+			this.app.metadataCache.on("changed", (file) => {
+				invalidate();
+				if (file instanceof TFile) {
+					this.taskLifecycle.onMetadataChange(file);
+				}
+			}),
 		);
 	}
 
@@ -195,6 +234,68 @@ export default class ArcanaPlugin extends Plugin {
 			defaultPriority: this.settings.defaultTaskPriority,
 			useAI: this.aiEngine.getActiveProvider().isConfigured(),
 		}).open();
+	}
+
+	private async completeCurrentTask(file: TFile): Promise<void> {
+		const cache = this.app.metadataCache.getFileCache(file);
+		if (cache?.frontmatter?.status === "done") {
+			new Notice("This task is already marked as done.");
+			return;
+		}
+
+		const deps = await this.taskLifecycle.checkDependencies(file);
+		if (!deps.met) {
+			const names = deps.pending
+				.map((d) => d.title)
+				.join(", ");
+			new Notice(
+				`Warning: unmet dependencies: ${names}. Completing anyway.`,
+			);
+		}
+
+		try {
+			await this.taskLifecycle.completeTask(file);
+			const title = cache?.frontmatter?.title ?? file.basename;
+			new Notice(`Task completed: ${title}`);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			new Notice(`Failed to complete task: ${msg}`);
+		}
+	}
+
+	private async extractTasksFromActiveNote(file: TFile): Promise<void> {
+		const provider = this.aiEngine.getActiveProvider();
+		if (!provider.isConfigured()) {
+			new Notice(
+				"AI provider is not configured. Set up an AI provider in Arcana settings.",
+			);
+			return;
+		}
+
+		new Notice("Analyzing note for action items...");
+
+		try {
+			const content = await this.app.vault.read(file);
+			const items = await extractTasksFromContent(
+				this.aiEngine,
+				content,
+			);
+
+			if (items.length === 0) {
+				new Notice("No action items detected in this note.");
+				return;
+			}
+
+			new ExtractTasksModal(this.app, items, {
+				noteCreator: this.noteCreator,
+				taskFolder: this.settings.taskFolderPath,
+				defaultStatus: this.settings.defaultTaskStatus,
+				defaultPriority: this.settings.defaultTaskPriority,
+			}).open();
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			new Notice(`Failed to extract tasks: ${msg}`);
+		}
 	}
 
 	private async generateTaskViews(): Promise<void> {

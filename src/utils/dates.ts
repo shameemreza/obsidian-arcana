@@ -120,6 +120,27 @@ export function todayISO(): string {
 	return formatDate(new Date());
 }
 
+// --- Exported Helpers ---
+
+export function addDays(d: Date, n: number): Date {
+	const result = new Date(d);
+	result.setDate(result.getDate() + n);
+	return result;
+}
+
+export function addMonths(d: Date, n: number): Date {
+	const result = new Date(d);
+	result.setMonth(result.getMonth() + n);
+	return result;
+}
+
+export function formatDate(d: Date): string {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, "0");
+	const day = String(d.getDate()).padStart(2, "0");
+	return `${y}-${m}-${day}`;
+}
+
 // --- Internal Helpers ---
 
 const DAY_NAMES = [
@@ -161,28 +182,9 @@ function stripTime(d: Date): Date {
 	return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-function addDays(d: Date, n: number): Date {
-	const result = new Date(d);
-	result.setDate(result.getDate() + n);
-	return result;
-}
-
-function addMonths(d: Date, n: number): Date {
-	const result = new Date(d);
-	result.setMonth(result.getMonth() + n);
-	return result;
-}
-
 function nextWeekday(from: Date, targetDay: number): Date {
 	const current = from.getDay();
 	let diff = targetDay - current;
 	if (diff <= 0) diff += 7;
 	return addDays(from, diff);
-}
-
-function formatDate(d: Date): string {
-	const y = d.getFullYear();
-	const m = String(d.getMonth() + 1).padStart(2, "0");
-	const day = String(d.getDate()).padStart(2, "0");
-	return `${y}-${m}-${day}`;
 }
