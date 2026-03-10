@@ -748,3 +748,40 @@
 	border-radius: var(--radius-s);
 }
 
+/* ============================================================
+   Bases Task Views -- table enhancements
+   ============================================================ */
+
+.bases-tr:hover .bases-td {
+	background-color: var(--background-modifier-hover);
+}
+
+.bases-thead .bases-table-header {
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   Bases Task Views -- card enhancements
+   ============================================================ */
+
+.bases-card {
+	transition: box-shadow 120ms ease-in-out,
+		border-color 120ms ease-in-out;
+}
+
+.bases-card:hover {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	border-color: var(--background-modifier-border-hover);
+}
+
+.bases-group-header {
+	font-weight: var(--font-semibold);
+	border-bottom: 2px solid var(--background-modifier-border);
+	padding-bottom: var(--size-4-1);
+	margin-bottom: var(--size-4-2);
+}
+

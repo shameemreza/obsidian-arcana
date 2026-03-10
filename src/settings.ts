@@ -4,6 +4,7 @@ import {
 	AI_PROVIDERS,
 	TASK_STATUSES,
 	TASK_PRIORITIES,
+	TASK_VIEW_NAMES,
 	VOICE_PROVIDERS,
 	CHRONOTYPES,
 	NOTIFICATION_LEVELS,
@@ -16,6 +17,7 @@ import {
 } from "./constants";
 import type {
 	AIProviderType,
+	TaskViewName,
 	VoiceProviderType,
 	ChronotypeType,
 	NotificationLevel,
@@ -40,6 +42,7 @@ export interface ArcanaSettings {
 	vaultWideTaskScan: boolean;
 	defaultTaskStatus: string;
 	defaultTaskPriority: string;
+	taskViewsEnabled: Record<TaskViewName, boolean>;
 
 	// Voice
 	voiceProvider: VoiceProviderType;
@@ -114,6 +117,9 @@ export const DEFAULT_SETTINGS: ArcanaSettings = {
 	vaultWideTaskScan: true,
 	defaultTaskStatus: "inbox",
 	defaultTaskPriority: "medium",
+	taskViewsEnabled: Object.fromEntries(
+		TASK_VIEW_NAMES.map((name) => [name, true]),
+	) as Record<TaskViewName, boolean>,
 
 	// Voice
 	voiceProvider: VOICE_PROVIDERS.WEB_SPEECH,
@@ -439,6 +445,61 @@ export class ArcanaSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 			});
+
+		// --- Task Views ---
+		new Setting(containerEl).setName("Task views (Bases)").setHeading();
+
+		const viewDescriptions: Record<TaskViewName, { label: string; desc: string }> = {
+			list: { label: "All Tasks", desc: "Table showing every task regardless of status." },
+			board: { label: "Task Board", desc: "Cards grouped by status for visual workflow tracking." },
+			calendar: { label: "Task Schedule", desc: "Table sorted by due date so you see what is coming when." },
+			today: { label: "Due Today", desc: "Only tasks due today plus anything overdue." },
+			agenda: { label: "Upcoming", desc: "Active tasks ahead of you, sorted by due date." },
+		};
+
+		for (const viewName of TASK_VIEW_NAMES) {
+			const info = viewDescriptions[viewName];
+			new Setting(containerEl)
+				.setName(info.label)
+				.setDesc(info.desc)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.taskViewsEnabled[viewName])
+						.onChange(async (value) => {
+							this.plugin.settings.taskViewsEnabled[viewName] = value;
+							await this.plugin.saveSettings();
+						})
+				);
+		}
+
+		new Setting(containerEl)
+			.setDesc(
+				"Run the \"Generate task views\" command from the command palette " +
+				"to create or refresh .base files in your vault root. " +
+				"Requires the Bases core plugin to be enabled.",
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText("Generate now")
+					.onClick(async () => {
+						btn.setButtonText("Generating...");
+						btn.setDisabled(true);
+						try {
+							const { writeTaskViews } = await import("./utils/bases");
+							const count = await writeTaskViews(
+								this.app,
+								this.plugin.settings.taskFolderPath,
+								this.plugin.settings.taskViewsEnabled,
+							);
+							new Notice(`Generated ${count} task view(s).`);
+						} catch (e) {
+							const msg = e instanceof Error ? e.message : String(e);
+							new Notice(`Failed to generate views: ${msg}`);
+						}
+						btn.setDisabled(false);
+						btn.setButtonText("Generate now");
+					}),
+			);
 
 		// --- Voice ---
 		new Setting(containerEl).setName("Voice").setHeading();

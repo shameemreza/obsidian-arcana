@@ -1,4 +1,4 @@
-import { Plugin, normalizePath } from "obsidian";
+import { Notice, Plugin, normalizePath } from "obsidian";
 import { ArcanaSettingTab, DEFAULT_SETTINGS } from "./settings";
 import type { ArcanaSettings } from "./settings";
 import { AIEngine } from "./core/ai/ai-engine";
@@ -76,6 +76,12 @@ export default class ArcanaPlugin extends Plugin {
 			id: "quick-task",
 			name: "Quick task",
 			callback: () => this.openQuickTask(),
+		});
+
+		this.addCommand({
+			id: "generate-task-views",
+			name: "Generate task views",
+			callback: () => this.generateTaskViews(),
 		});
 
 		this.addSettingTab(new ArcanaSettingTab(this.app, this));
@@ -189,6 +195,26 @@ export default class ArcanaPlugin extends Plugin {
 			defaultPriority: this.settings.defaultTaskPriority,
 			useAI: this.aiEngine.getActiveProvider().isConfigured(),
 		}).open();
+	}
+
+	private async generateTaskViews(): Promise<void> {
+		try {
+			const { writeTaskViews } = await import("./utils/bases");
+			const count = await writeTaskViews(
+				this.app,
+				this.settings.taskFolderPath,
+				this.settings.taskViewsEnabled,
+			);
+			new Notice(
+				count > 0
+					? `Generated ${count} task view(s).`
+					: "No task views enabled. Enable views in Arcana settings.",
+			);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			new Notice(`Failed to generate task views: ${msg}`);
+			console.error("[Arcana] Task view generation failed:", e);
+		}
 	}
 
 	private async toggleChat(): Promise<void> {

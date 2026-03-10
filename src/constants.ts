@@ -59,3 +59,11 @@ export const NOTIFICATION_LEVELS = {
 	NORMAL: "normal",
 	VERBOSE: "verbose",
 } as const;
+
+export const TASK_VIEW_NAMES = [
+	"list",
+	"board",
+	"calendar",
+	"today",
+	"agenda",
+] as const;

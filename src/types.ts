@@ -2,6 +2,7 @@ import type {
 	AI_PROVIDERS,
 	TASK_STATUSES,
 	TASK_PRIORITIES,
+	TASK_VIEW_NAMES,
 	VOICE_PROVIDERS,
 	CHRONOTYPES,
 	NOTIFICATION_LEVELS,
@@ -10,6 +11,7 @@ import type {
 export type AIProviderType = typeof AI_PROVIDERS[keyof typeof AI_PROVIDERS];
 export type TaskStatus = typeof TASK_STATUSES[number];
 export type TaskPriority = typeof TASK_PRIORITIES[number];
+export type TaskViewName = typeof TASK_VIEW_NAMES[number];
 export type VoiceProviderType = typeof VOICE_PROVIDERS[keyof typeof VOICE_PROVIDERS];
 export type ChronotypeType = typeof CHRONOTYPES[keyof typeof CHRONOTYPES];
 export type NotificationLevel = typeof NOTIFICATION_LEVELS[keyof typeof NOTIFICATION_LEVELS];
