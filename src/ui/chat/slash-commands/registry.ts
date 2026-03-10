@@ -11,6 +11,7 @@ import { worktogetherCommand } from "./commands/worktogether";
 import { dumpCommand } from "./commands/dump";
 import { eveningCommand } from "./commands/evening";
 import { extractTasksCommand } from "./commands/extract-tasks";
+import { breakdownCommand } from "./commands/breakdown";
 
 const BUILT_IN_COMMANDS: SlashCommand[] = [
 	taskCommand,
@@ -25,6 +26,7 @@ const BUILT_IN_COMMANDS: SlashCommand[] = [
 	dumpCommand,
 	eveningCommand,
 	extractTasksCommand,
+	breakdownCommand,
 ];
 
 const commandMap = new Map<string, SlashCommand>();

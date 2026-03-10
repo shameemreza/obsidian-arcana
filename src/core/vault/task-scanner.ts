@@ -2,6 +2,7 @@ import { App, TFile, TFolder, normalizePath } from "obsidian";
 import type { TaskFrontmatter, TaskStatus, TaskPriority } from "../../types";
 import { TASK_STATUSES, TASK_PRIORITIES } from "../../constants";
 import type { ArcanaSettings } from "../../settings";
+import { parseTimeEstimate } from "../../utils/frontmatter";
 
 export interface DiscoveredTask {
 	file: TFile;
@@ -138,14 +139,18 @@ export class TaskScanner {
 			...(typeof fm.completed === "string" ? { completed: fm.completed } : {}),
 			...(tags.length > 0 ? { tags } : {}),
 			...(typeof fm.context === "string" ? { context: fm.context } : {}),
-			...(typeof fm.time_estimate === "number" ? { time_estimate: fm.time_estimate } : {}),
+			...(parseTimeEstimate(fm.time_estimate) != null
+				? { time_estimate: parseTimeEstimate(fm.time_estimate) as number }
+				: {}),
 			...(typeof fm.actual_time === "number" ? { actual_time: fm.actual_time } : {}),
 			...(typeof fm.difficulty === "string" &&
 				["easy", "medium", "hard"].includes(fm.difficulty)
 				? { difficulty: fm.difficulty as "easy" | "medium" | "hard" }
 				: {}),
 			...(typeof fm.trigger === "string" ? { trigger: fm.trigger } : {}),
-			...(typeof fm.parent_task === "string" ? { parent_task: fm.parent_task } : {}),
+			...(resolveParentTask(fm.parent_task)
+				? { parent_task: resolveParentTask(fm.parent_task) as string }
+				: {}),
 			...(typeof fm.subtask_progress === "string"
 				? { subtask_progress: fm.subtask_progress }
 				: {}),
@@ -155,4 +160,20 @@ export class TaskScanner {
 
 		return { file, frontmatter };
 	}
+}
+
+/**
+ * Resolve a parent_task value that may be a properly quoted string
+ * ("[[basename]]") or a YAML-misinterpreted nested array from
+ * unquoted [[basename]] syntax.
+ */
+function resolveParentTask(raw: unknown): string | null {
+	if (typeof raw === "string") return raw;
+	if (Array.isArray(raw)) {
+		const inner = raw.flat(3);
+		if (inner.length === 1 && typeof inner[0] === "string") {
+			return `[[${inner[0]}]]`;
+		}
+	}
+	return null;
 }

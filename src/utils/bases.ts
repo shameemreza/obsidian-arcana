@@ -43,6 +43,10 @@ function propertiesBlock(): string[] {
 		"    displayName: Due",
 		"  tags:",
 		"    displayName: Tags",
+		"  parent_task:",
+		"    displayName: Parent",
+		"  subtask_progress:",
+		"    displayName: Progress",
 	];
 }
 
@@ -59,6 +63,8 @@ const STD_COLUMNS = [
 	"note.priority",
 	"note.due",
 	"note.tags",
+	"note.subtask_progress",
+	"note.parent_task",
 ];
 
 const DUE_FIRST_COLUMNS = [
@@ -67,6 +73,8 @@ const DUE_FIRST_COLUMNS = [
 	"note.status",
 	"note.priority",
 	"note.tags",
+	"note.subtask_progress",
+	"note.parent_task",
 ];
 
 // ---------------------------------------------------------------------------
@@ -94,7 +102,7 @@ function buildBoard(folder: string): string {
 		"    groupBy:",
 		"      property: note.status",
 		"      direction: ASC",
-		...orderLines(["file.name", "note.priority", "note.due", "note.tags"]),
+		...orderLines(["file.name", "note.priority", "note.due", "note.tags", "note.subtask_progress", "note.parent_task"]),
 	].join("\n") + "\n";
 }
 

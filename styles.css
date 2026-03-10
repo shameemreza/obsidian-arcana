@@ -807,3 +807,79 @@
 	border-bottom: none;
 }
 
+/* ============================================================
+   Subtask Completion Micro-Win Animation
+   ============================================================ */
+
+.arcana-subtask-complete-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	pointer-events: none;
+	z-index: 999999;
+	animation: arcana-overlay-fade 1.4s ease-out forwards;
+}
+
+.arcana-subtask-complete-checkmark {
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	background-color: var(--interactive-success, #34d399);
+	position: relative;
+	animation: arcana-check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.arcana-subtask-complete-checkmark::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 22px;
+	height: 34px;
+	border-right: 4px solid var(--text-on-accent, #ffffff);
+	border-bottom: 4px solid var(--text-on-accent, #ffffff);
+	transform: translate(-50%, -60%) rotate(45deg) scale(0);
+	animation: arcana-check-draw 0.3s ease-out 0.2s forwards;
+}
+
+@keyframes arcana-check-pop {
+	0% {
+		transform: scale(0);
+		opacity: 0;
+	}
+	60% {
+		transform: scale(1.2);
+		opacity: 1;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+@keyframes arcana-check-draw {
+	0% {
+		transform: translate(-50%, -60%) rotate(45deg) scale(0);
+	}
+	100% {
+		transform: translate(-50%, -60%) rotate(45deg) scale(1);
+	}
+}
+
+@keyframes arcana-overlay-fade {
+	0% {
+		opacity: 1;
+	}
+	65% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+

@@ -146,6 +146,16 @@ Pour out whatever is on your mind. AI processes the raw text and sorts it into:
 
 Each item gets created as a proper file in your vault. Based on the Zeigarnik effect: writing things down frees up the mental space you were using to hold them.
 
+#### `/breakdown` - Break down a task into subtasks
+
+```
+/breakdown
+```
+
+Opens the current task note, analyzes it with AI, and splits it into smaller, concrete subtasks. Each subtask becomes its own task note inside a subfolder named after the parent task, with a `parent_task` link back to the original. The parent task gets a `subtask_progress` field (like `"2/5"`) that updates automatically as you complete subtasks. Completing a subtask shows a brief checkmark animation as micro-win feedback.
+
+The AI decides how many subtasks to create based on complexity (anywhere from 2 to 12+), generates short action-phrase titles, and writes detailed descriptions into each subtask's body. Subtasks inherit the parent's priority, tags, context, and due date.
+
 #### `/evening` - End-of-day review
 
 ```
@@ -310,7 +320,7 @@ tags:
   - work
   - vendors
 context: Q3 review
-time_estimate: 30
+time_estimate: 30 min
 ---
 ```
 
@@ -319,6 +329,36 @@ Statuses: `inbox`, `todo`, `doing`, `waiting`, `done`, `cancelled`.
 Priorities: `urgent`, `high`, `medium`, `low`, `none`.
 
 Natural language input supports tags (`#work`), priority markers (`priority:high`, `!!!`, `ASAP`), and due dates (`by Friday`, `due next Monday`, `before March 15`, `in 3 days`).
+
+#### Time estimates
+
+Time estimates are stored with human-readable units: `10 min`, `1 hr`, `1 hr 30 min`, `1 day`. When you enter a number in the task modal, it is treated as minutes and formatted automatically. Legacy bare numbers (like `30`) are still read correctly.
+
+#### Task chunking and subtasks
+
+Use the **Break down current task into subtasks** command (or `/breakdown` in chat) to split any task into smaller pieces. AI analyzes the task and creates concrete subtasks, each as its own note inside a subfolder:
+
+```
+Tasks/
+  Personal/
+    Review vendor submission/
+      Review vendor submission.md           <-- parent task
+      2026-03-10-check-pricing.md           <-- subtask
+      2026-03-10-verify-references.md       <-- subtask
+      2026-03-10-draft-summary.md           <-- subtask
+```
+
+Each subtask has a `parent_task` frontmatter field linking back to the parent. The parent has a `subtask_progress` field like `"1/3"` that updates automatically when subtasks are completed. Completing a subtask triggers a brief checkmark animation.
+
+Subtasks inherit the parent's priority, tags, context, due date, and scheduled date. The AI generates short titles and writes detailed instructions into each subtask's body.
+
+#### Bases views
+
+Run **Generate task views** from the command palette to create `.base` files for the Obsidian Bases plugin. Views include Upcoming, Task Schedule, and a Kanban board, all showing parent task links and subtask progress columns.
+
+#### Property types
+
+Arcana registers frontmatter property types on load so Obsidian displays the correct icons in the Properties panel. Fields like `parent_task`, `subtask_progress`, `status`, `priority`, `context`, and `time_estimate` all get proper type indicators instead of the default question mark.
 
 ## Settings
 
@@ -416,33 +456,42 @@ src/
 │   └── vault/
 │       ├── vault-intel.ts          # Vault scanning and intelligence.
 │       ├── note-creator.ts         # Note and task creation.
-│       └── task-parser.ts          # Natural language to task parsing.
+│       ├── task-parser.ts          # Natural language to task parsing.
+│       ├── task-scanner.ts         # Task discovery and indexing.
+│       ├── task-lifecycle.ts       # Status changes, completion, recurrence.
+│       ├── task-chunking.ts        # AI subtask generation and progress.
+│       └── recurrence.ts           # Recurring task date computation.
 ├── ui/
-│   └── chat/
-│       ├── ChatView.ts             # Main chat sidebar (ItemView).
-│       ├── ChatInput.ts            # Input with mention and slash autocomplete.
-│       ├── MessageList.ts          # Message rendering and streaming.
-│       ├── ContextPicker.ts        # Note/Folder/Vault/None mode selector.
-│       ├── ConversationPicker.ts   # History browser modal with delete.
-│       └── slash-commands/
-│           ├── types.ts            # Command interface.
-│           ├── registry.ts         # Command registry with dynamic registration.
-│           └── commands/
-│               ├── task.ts         # /task
-│               ├── summarize.ts    # /summarize
-│               ├── find.ts         # /find
-│               ├── organize.ts     # /organize
-│               ├── connect.ts      # /connect
-│               ├── template.ts     # /template
-│               ├── focus.ts        # /focus
-│               ├── next.ts         # /next
-│               ├── worktogether.ts # /worktogether
-│               ├── dump.ts         # /dump
-│               └── evening.ts      # /evening
+│   ├── chat/
+│   │   ├── ChatView.ts             # Main chat sidebar (ItemView).
+│   │   ├── ChatInput.ts            # Input with mention and slash autocomplete.
+│   │   ├── MessageList.ts          # Message rendering and streaming.
+│   │   ├── ContextPicker.ts        # Note/Folder/Vault/None mode selector.
+│   │   ├── ConversationPicker.ts   # History browser modal with delete.
+│   │   └── slash-commands/
+│   │       ├── types.ts            # Command interface.
+│   │       ├── registry.ts         # Command registry with dynamic registration.
+│   │       └── commands/
+│   │           ├── task.ts         # /task
+│   │           ├── summarize.ts    # /summarize
+│   │           ├── find.ts         # /find
+│   │           ├── organize.ts     # /organize
+│   │           ├── connect.ts      # /connect
+│   │           ├── template.ts     # /template
+│   │           ├── focus.ts        # /focus
+│   │           ├── next.ts         # /next
+│   │           ├── worktogether.ts # /worktogether
+│   │           ├── dump.ts         # /dump
+│   │           ├── evening.ts      # /evening
+│   │           └── breakdown.ts    # /breakdown
+│   └── tasks/
+│       ├── TaskModal.ts            # Full task creation/edit modal.
+│       ├── QuickTaskModal.ts       # Quick capture modal.
+│       └── ExtractTasksModal.ts    # Extract tasks from note content.
 └── utils/
     ├── dates.ts                    # Natural language date parsing.
-    ├── frontmatter.ts              # YAML frontmatter generation.
-    └── bases.ts                    # .base file generator.
+    ├── frontmatter.ts              # YAML frontmatter and time formatting.
+    └── bases.ts                    # .base file generator for Bases plugin.
 ```
 
 ## License

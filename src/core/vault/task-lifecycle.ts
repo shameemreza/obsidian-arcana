@@ -2,9 +2,11 @@ import { App, Notice, TFile } from "obsidian";
 import type { TaskFrontmatter, TaskStatus, TaskPriority } from "../../types";
 import { TASK_STATUSES, TASK_PRIORITIES } from "../../constants";
 import { todayISO } from "../../utils/dates";
+import { parseTimeEstimate } from "../../utils/frontmatter";
 import { computeNextDue } from "./recurrence";
 import type { NoteCreator } from "./note-creator";
 import type { TaskScanner, DiscoveredTask } from "./task-scanner";
+import type { TaskChunking } from "./task-chunking";
 import type { ArcanaSettings } from "../../settings";
 
 const VALID_STATUSES: ReadonlySet<string> = new Set(TASK_STATUSES);
@@ -13,6 +15,7 @@ const VALID_PRIORITIES: ReadonlySet<string> = new Set(TASK_PRIORITIES);
 export class TaskLifecycle {
 	private statusCache = new Map<string, string>();
 	private processing = new Set<string>();
+	private taskChunking: TaskChunking | null = null;
 
 	constructor(
 		private app: App,
@@ -20,6 +23,10 @@ export class TaskLifecycle {
 		private taskScanner: TaskScanner,
 		private getSettings: () => ArcanaSettings,
 	) {}
+
+	setTaskChunking(chunking: TaskChunking): void {
+		this.taskChunking = chunking;
+	}
 
 	/**
 	 * Complete a task: set status to done, add completed date,
@@ -41,6 +48,7 @@ export class TaskLifecycle {
 			let recurrence: string | undefined;
 			let previousDue: string | undefined;
 			let taskData: TaskFrontmatter | null = null;
+			let parentTaskRef: unknown;
 
 			await this.app.fileManager.processFrontMatter(file, (fm) => {
 				fm.status = newStatus;
@@ -58,6 +66,7 @@ export class TaskLifecycle {
 				previousDue =
 					typeof fm.due === "string" ? fm.due : undefined;
 				taskData = buildTaskFromFrontmatter(fm, file);
+				parentTaskRef = fm.parent_task;
 			});
 
 			this.statusCache.set(file.path, newStatus);
@@ -67,6 +76,21 @@ export class TaskLifecycle {
 					taskData,
 					previousDue,
 					recurrence,
+				);
+			}
+
+			const hasParent =
+				typeof parentTaskRef === "string" ||
+				Array.isArray(parentTaskRef);
+			if (this.taskChunking && hasParent) {
+				const wasDone = false;
+				const isDone =
+					newStatus === "done" || newStatus === "cancelled";
+				await this.updateParentOnSubtaskChange(
+					file,
+					newStatus,
+					isDone,
+					wasDone,
 				);
 			}
 		} finally {
@@ -151,6 +175,82 @@ export class TaskLifecycle {
 				this.processing.delete(file.path);
 			}
 		}
+
+		const hasParent =
+			typeof fm.parent_task === "string" || Array.isArray(fm.parent_task);
+		if (this.taskChunking && previousStatus !== currentStatus && hasParent) {
+			const wasDone =
+				previousStatus === "done" || previousStatus === "cancelled";
+			const isDone =
+				currentStatus === "done" || currentStatus === "cancelled";
+			await this.updateParentOnSubtaskChange(
+				file,
+				currentStatus,
+				isDone,
+				wasDone,
+			);
+		}
+	}
+
+	/**
+	 * When a subtask's done/not-done state changes, apply a +1 or -1
+	 * delta to the parent's subtask_progress instead of rescanning
+	 * (the metadata cache is stale right after processFrontMatter).
+	 */
+	private async updateParentOnSubtaskChange(
+		subtaskFile: TFile,
+		newStatus: string,
+		isDoneNow: boolean,
+		wasDoneBefore: boolean,
+	): Promise<void> {
+		if (!this.taskChunking) return;
+		if (isDoneNow === wasDoneBefore) return;
+
+		const parentFile = this.taskChunking.findParentFile(subtaskFile);
+		if (!parentFile) return;
+
+		const parentCache =
+			this.app.metadataCache.getFileCache(parentFile);
+		const progress =
+			parentCache?.frontmatter?.subtask_progress;
+
+		if (typeof progress === "string") {
+			const match = progress.match(/^(\d+)\/(\d+)$/);
+			if (match) {
+				let done = parseInt(match[1], 10);
+				const total = parseInt(match[2], 10);
+				done = isDoneNow
+					? Math.min(done + 1, total)
+					: Math.max(done - 1, 0);
+				await this.taskChunking.setParentProgress(
+					parentFile,
+					done,
+					total,
+				);
+			}
+		}
+
+		if (isDoneNow) {
+			this.showSubtaskCompletionFeedback();
+		}
+	}
+
+	/**
+	 * Trigger a brief satisfying checkmark overlay animation.
+	 */
+	private showSubtaskCompletionFeedback(): void {
+		const overlay = document.createElement("div");
+		overlay.addClass("arcana-subtask-complete-overlay");
+
+		const checkmark = document.createElement("div");
+		checkmark.addClass("arcana-subtask-complete-checkmark");
+		overlay.appendChild(checkmark);
+
+		document.body.appendChild(overlay);
+
+		window.setTimeout(() => {
+			overlay.remove();
+		}, 1200);
 	}
 
 	/**
@@ -315,8 +415,8 @@ function buildTaskFromFrontmatter(
 			: {}),
 		...(tags.length > 0 ? { tags } : {}),
 		...(typeof fm.context === "string" ? { context: fm.context } : {}),
-		...(typeof fm.time_estimate === "number"
-			? { time_estimate: fm.time_estimate }
+		...(parseTimeEstimate(fm.time_estimate) != null
+			? { time_estimate: parseTimeEstimate(fm.time_estimate) as number }
 			: {}),
 		...(typeof fm.actual_time === "number"
 			? { actual_time: fm.actual_time }
@@ -331,8 +431,8 @@ function buildTaskFromFrontmatter(
 				}
 			: {}),
 		...(typeof fm.trigger === "string" ? { trigger: fm.trigger } : {}),
-		...(typeof fm.parent_task === "string"
-			? { parent_task: fm.parent_task }
+		...(resolveParentTaskValue(fm.parent_task)
+			? { parent_task: resolveParentTaskValue(fm.parent_task) as string }
 			: {}),
 		...(typeof fm.subtask_progress === "string"
 			? { subtask_progress: fm.subtask_progress }
@@ -344,6 +444,17 @@ function buildTaskFromFrontmatter(
 			? { depends_on: dependsOn }
 			: {}),
 	};
+}
+
+function resolveParentTaskValue(raw: unknown): string | null {
+	if (typeof raw === "string") return raw;
+	if (Array.isArray(raw)) {
+		const inner = raw.flat(3);
+		if (inner.length === 1 && typeof inner[0] === "string") {
+			return `[[${inner[0]}]]`;
+		}
+	}
+	return null;
 }
 
 function buildTaskIndex(

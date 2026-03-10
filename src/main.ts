@@ -7,6 +7,7 @@ import { NoteCreator } from "./core/vault/note-creator";
 import { TaskParser, extractTasksFromContent } from "./core/vault/task-parser";
 import { TaskScanner } from "./core/vault/task-scanner";
 import { TaskLifecycle } from "./core/vault/task-lifecycle";
+import { TaskChunking } from "./core/vault/task-chunking";
 import { ChatHistory } from "./core/chat-history";
 import { SkillLoader } from "./core/commands/skill-loader";
 import { SkillRunner } from "./core/commands/skill-runner";
@@ -30,6 +31,7 @@ export default class ArcanaPlugin extends Plugin {
 	taskParser!: TaskParser;
 	taskScanner!: TaskScanner;
 	taskLifecycle!: TaskLifecycle;
+	taskChunking!: TaskChunking;
 	chatHistory!: ChatHistory;
 	skillLoader!: SkillLoader;
 	skillRunner!: SkillRunner;
@@ -48,6 +50,14 @@ export default class ArcanaPlugin extends Plugin {
 			this.taskScanner,
 			() => this.settings,
 		);
+		this.taskChunking = new TaskChunking(
+			this.app,
+			this.aiEngine,
+			this.noteCreator,
+			this.taskScanner,
+			() => this.settings,
+		);
+		this.taskLifecycle.setTaskChunking(this.taskChunking);
 		this.chatHistory = new ChatHistory(
 			this.app,
 			() => this.settings,
@@ -117,6 +127,18 @@ export default class ArcanaPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "break-down-task",
+			name: "Break down current task into subtasks",
+			checkCallback: (checking) => {
+				const file = this.taskChunking.getActiveChunkableFile();
+				if (!file) return false;
+				if (checking) return true;
+				this.breakDownTask(file);
+				return true;
+			},
+		});
+
 		this.addSettingTab(new ArcanaSettingTab(this.app, this));
 
 		this.registerVaultEvents();
@@ -125,11 +147,43 @@ export default class ArcanaPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(() => {
 			this.loadCustomCommands();
 			this.taskLifecycle.initializeStatusCache();
+			this.registerPropertyTypes();
 		});
 	}
 
 	onunload() {
 		clearCustomCommands();
+	}
+
+	/**
+	 * Register frontmatter property types so Obsidian displays
+	 * the correct icons and widgets in the Properties panel.
+	 */
+	private registerPropertyTypes(): void {
+		const types: Record<string, string> = {
+			parent_task: "text",
+			subtask_progress: "text",
+			time_estimate: "text",
+			actual_time: "number",
+			status: "text",
+			priority: "text",
+			context: "text",
+			difficulty: "text",
+			trigger: "text",
+			recurrence: "text",
+		};
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const mgr = (this.app as any).metadataTypeManager;
+		if (!mgr || typeof mgr.setType !== "function") return;
+
+		for (const [key, type] of Object.entries(types)) {
+			try {
+				mgr.setType(key, type);
+			} catch {
+				// Internal API may change across versions
+			}
+		}
 	}
 
 	async loadCustomCommands(): Promise<void> {
@@ -295,6 +349,49 @@ export default class ArcanaPlugin extends Plugin {
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			new Notice(`Failed to extract tasks: ${msg}`);
+		}
+	}
+
+	private async breakDownTask(file: TFile): Promise<void> {
+		const provider = this.aiEngine.getActiveProvider();
+		if (!provider.isConfigured()) {
+			new Notice(
+				"AI provider is not configured. Set up an AI provider in Arcana settings.",
+			);
+			return;
+		}
+
+		const progress = new Notice(
+			"Breaking down task... this may take a moment.",
+			0,
+		);
+
+		try {
+			const subtasks = await this.taskChunking.generateSubtasks(file);
+			if (subtasks.length === 0) {
+				progress.hide();
+				new Notice(
+					"Could not generate subtasks. Try adding more detail to the task.",
+				);
+				return;
+			}
+
+			progress.setMessage(
+				`Creating ${subtasks.length} subtask(s)...`,
+			);
+
+			const files = await this.taskChunking.createSubtasks(
+				file,
+				subtasks,
+			);
+			progress.hide();
+			new Notice(
+				`Created ${files.length} subtask(s) for this task.`,
+			);
+		} catch (e) {
+			progress.hide();
+			const msg = e instanceof Error ? e.message : String(e);
+			new Notice(`Failed to break down task: ${msg}`);
 		}
 	}
 

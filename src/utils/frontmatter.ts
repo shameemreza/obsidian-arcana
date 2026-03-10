@@ -33,6 +33,10 @@ function formatYamlValue(value: unknown): string {
 			value.includes("#") ||
 			value.includes('"') ||
 			value.includes("'") ||
+			value.includes("[") ||
+			value.includes("]") ||
+			value.includes("{") ||
+			value.includes("}") ||
 			value.startsWith(" ") ||
 			value.endsWith(" ")
 		) {
@@ -76,7 +80,8 @@ export function buildTaskNote(
 	if (task.completed) fm.completed = task.completed;
 	if (task.tags && task.tags.length > 0) fm.tags = task.tags;
 	if (task.context) fm.context = task.context;
-	if (task.time_estimate != null) fm.time_estimate = task.time_estimate;
+	if (task.time_estimate != null)
+		fm.time_estimate = formatTimeEstimate(task.time_estimate);
 	if (task.actual_time != null) fm.actual_time = task.actual_time;
 	if (task.difficulty) fm.difficulty = task.difficulty;
 	if (task.trigger) fm.trigger = task.trigger;
@@ -109,4 +114,43 @@ export function slugify(text: string): string {
 export function taskFilename(title: string, date?: string): string {
 	const dateStr = date ?? new Date().toISOString().slice(0, 10);
 	return `${dateStr}-${slugify(title)}.md`;
+}
+
+/**
+ * Convert a number of minutes to a human-readable string.
+ * Examples: 10 -> "10 min", 60 -> "1 hr", 90 -> "1 hr 30 min",
+ * 1440 -> "1 day", 2880 -> "2 days"
+ */
+export function formatTimeEstimate(minutes: number): string {
+	if (minutes < 60) return `${minutes} min`;
+	if (minutes < 1440) {
+		const hrs = Math.floor(minutes / 60);
+		const mins = minutes % 60;
+		const hrLabel = hrs === 1 ? "1 hr" : `${hrs} hrs`;
+		return mins > 0 ? `${hrLabel} ${mins} min` : hrLabel;
+	}
+	const days = Math.floor(minutes / 1440);
+	const remaining = minutes % 1440;
+	const dayLabel = days === 1 ? "1 day" : `${days} days`;
+	if (remaining === 0) return dayLabel;
+	const hrs = Math.floor(remaining / 60);
+	if (hrs > 0) return `${dayLabel} ${hrs} hr`;
+	return dayLabel;
+}
+
+/**
+ * Parse a time estimate value from frontmatter back to minutes.
+ * Handles both legacy numbers (10) and formatted strings ("10 min", "1 hr 30 min").
+ */
+export function parseTimeEstimate(value: unknown): number | null {
+	if (typeof value === "number") return value;
+	if (typeof value !== "string") return null;
+	let total = 0;
+	const dayMatch = value.match(/(\d+)\s*days?/);
+	const hrMatch = value.match(/(\d+)\s*hrs?/);
+	const minMatch = value.match(/(\d+)\s*min/);
+	if (dayMatch) total += parseInt(dayMatch[1], 10) * 1440;
+	if (hrMatch) total += parseInt(hrMatch[1], 10) * 60;
+	if (minMatch) total += parseInt(minMatch[1], 10);
+	return total > 0 ? total : null;
 }
