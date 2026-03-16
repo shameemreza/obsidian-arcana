@@ -61,7 +61,8 @@ export class TaskParser {
 			'  "tags": ["tag1", "tag2"],',
 			'  "context": "project or area name, or null",',
 			'  "time_estimate": minutes as number or null,',
-			'  "difficulty": "easy|medium|hard (based on task complexity)"',
+			'  "difficulty": "easy|medium|hard (based on task complexity)",',
+			'  "trigger": "implementation intention if mentioned, e.g. after lunch, at 2pm, after Deploy PR, or null"',
 			'}',
 		].join("\n");
 
@@ -92,9 +93,56 @@ export class TaskParser {
 				...(validDifficulty(json.difficulty)
 					? { difficulty: json.difficulty as "easy" | "medium" | "hard" }
 					: {}),
+				...(typeof json.trigger === "string" && json.trigger !== "null"
+					? { trigger: json.trigger }
+					: {}),
 			};
 		} catch {
 			return this.parse(input);
+		}
+	}
+
+	/**
+	 * Use AI to suggest an implementation intention for a task.
+	 * Returns a concrete "when X, I will start" suggestion, or null.
+	 */
+	async suggestTrigger(
+		title: string,
+		notes?: string,
+		due?: string,
+		scheduled?: string,
+	): Promise<string | null> {
+		const provider = this.aiEngine.getActiveProvider();
+		if (!provider.isConfigured()) return null;
+
+		const parts = [`Task: ${title}`];
+		if (notes) parts.push(`Notes: ${notes.slice(0, 300)}`);
+		if (due) parts.push(`Due: ${due}`);
+		if (scheduled) parts.push(`Scheduled: ${scheduled}`);
+
+		const prompt = [
+			"Suggest a concrete implementation intention for this task.",
+			"An implementation intention is a specific plan: 'after [event/time], I will start this task.'",
+			"",
+			"Rules:",
+			"- Be specific and actionable",
+			"- Tie it to a concrete event or time the user can recognize",
+			"- Keep it short, under 15 words",
+			"- Do NOT include quotes around the suggestion",
+			"- Respond with ONLY the trigger text, nothing else",
+			"",
+			parts.join("\n"),
+		].join("\n");
+
+		try {
+			const response = await this.aiEngine.chatComplete(
+				[{ role: "user", content: prompt, timestamp: Date.now() }],
+				{ temperature: 0.3, maxTokens: 50 },
+			);
+			const cleaned = response.trim().replace(/^["']|["']$/g, "");
+			return cleaned.length > 0 && cleaned.length < 200 ? cleaned : null;
+		} catch {
+			return null;
 		}
 	}
 

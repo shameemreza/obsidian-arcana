@@ -34,6 +34,7 @@ export const taskCommand: SlashCommand = {
 			if (task.context) parts.push(`Context: ${task.context}`);
 			if (task.time_estimate) parts.push(`Estimate: ${task.time_estimate} min`);
 			if (task.difficulty) parts.push(`Difficulty: ${task.difficulty}`);
+			if (task.trigger) parts.push(`Trigger: ${task.trigger}`);
 			parts.push("", `Saved to \`${file.path}\``);
 
 			ctx.finalizeStreaming(el, parts.join("\n"));

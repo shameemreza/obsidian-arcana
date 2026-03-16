@@ -9,6 +9,7 @@ import { TaskParser, extractTasksFromContent } from "./core/vault/task-parser";
 import { TaskScanner } from "./core/vault/task-scanner";
 import { TaskLifecycle } from "./core/vault/task-lifecycle";
 import { TaskChunking } from "./core/vault/task-chunking";
+import { TriggerMonitor } from "./core/vault/trigger-monitor";
 import { FocusTracker } from "./core/vault/focus-tracker";
 import { addEstimationRecord } from "./core/vault/estimation-tracker";
 import { ChatHistory } from "./core/chat-history";
@@ -37,9 +38,11 @@ export default class ArcanaPlugin extends Plugin {
 	taskLifecycle!: TaskLifecycle;
 	taskChunking!: TaskChunking;
 	focusTracker!: FocusTracker;
+	triggerMonitor!: TriggerMonitor;
 	chatHistory!: ChatHistory;
 	skillLoader!: SkillLoader;
 	skillRunner!: SkillRunner;
+	private triggerRefreshTimer: number | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -64,6 +67,13 @@ export default class ArcanaPlugin extends Plugin {
 		);
 		this.taskLifecycle.setTaskChunking(this.taskChunking);
 		this.focusTracker = new FocusTracker();
+		this.triggerMonitor = new TriggerMonitor(
+			this.taskScanner,
+			() => this.settings,
+		);
+		this.taskLifecycle.onTaskComplete((title) => {
+			this.triggerMonitor.onTaskCompleted(title);
+		});
 		this.chatHistory = new ChatHistory(
 			this.app,
 			() => this.settings,
@@ -153,12 +163,17 @@ export default class ArcanaPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(() => {
 			this.loadCustomCommands();
 			this.taskLifecycle.initializeStatusCache();
+			this.triggerMonitor.scheduleTimeReminders();
 			this.registerPropertyTypes();
 		});
 	}
 
 	onunload() {
 		clearCustomCommands();
+		this.triggerMonitor.destroy();
+		if (this.triggerRefreshTimer != null) {
+			window.clearTimeout(this.triggerRefreshTimer);
+		}
 	}
 
 	/**
@@ -239,6 +254,7 @@ export default class ArcanaPlugin extends Plugin {
 				if (file instanceof TFile) {
 					this.taskLifecycle.onMetadataChange(file);
 				}
+				this.debounceTriggerRefresh();
 			}),
 		);
 	}
@@ -274,6 +290,16 @@ export default class ArcanaPlugin extends Plugin {
 				}
 			}),
 		);
+	}
+
+	private debounceTriggerRefresh(): void {
+		if (this.triggerRefreshTimer != null) {
+			window.clearTimeout(this.triggerRefreshTimer);
+		}
+		this.triggerRefreshTimer = window.setTimeout(() => {
+			this.triggerRefreshTimer = null;
+			this.triggerMonitor.refresh();
+		}, 2000);
 	}
 
 	private openTaskModal(): void {
@@ -334,6 +360,7 @@ export default class ArcanaPlugin extends Plugin {
 			await this.taskLifecycle.completeTask(file);
 			new Notice(`Task completed: ${title}`);
 			this.showTaskCompletionAnimation();
+			this.triggerMonitor.onTaskCompleted(title);
 
 			if (this.settings.timeEstimationTraining) {
 				await this.delay(800);

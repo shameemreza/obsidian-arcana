@@ -16,6 +16,7 @@ export class TaskLifecycle {
 	private statusCache = new Map<string, string>();
 	private processing = new Set<string>();
 	private taskChunking: TaskChunking | null = null;
+	private completionCallbacks: ((title: string) => void)[] = [];
 
 	constructor(
 		private app: App,
@@ -23,6 +24,14 @@ export class TaskLifecycle {
 		private taskScanner: TaskScanner,
 		private getSettings: () => ArcanaSettings,
 	) {}
+
+	/**
+	 * Register a callback that fires whenever a task transitions to done.
+	 * Used by the trigger monitor to detect after-task triggers.
+	 */
+	onTaskComplete(callback: (title: string) => void): void {
+		this.completionCallbacks.push(callback);
+	}
 
 	setTaskChunking(chunking: TaskChunking): void {
 		this.taskChunking = chunking;
@@ -156,6 +165,12 @@ export class TaskLifecycle {
 							recurrence,
 						);
 					}
+				}
+
+				const title =
+					typeof fm.title === "string" ? fm.title : file.basename;
+				for (const cb of this.completionCallbacks) {
+					cb(title);
 				}
 			} finally {
 				this.processing.delete(file.path);

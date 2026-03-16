@@ -35,11 +35,13 @@ export class TaskModal extends Modal {
 	private folder = "";
 	private timeEstimate = "";
 	private difficulty: "easy" | "medium" | "hard" | "" = "";
+	private trigger = "";
 	private notes = "";
 
 	private isEditing: boolean;
 	private options: TaskModalOptions;
 	private insightEl: HTMLElement | null = null;
+	private triggerInputEl: HTMLInputElement | null = null;
 
 	constructor(app: App, options: TaskModalOptions) {
 		super(app);
@@ -59,6 +61,7 @@ export class TaskModal extends Modal {
 			this.folder = fm.context ?? "";
 			this.timeEstimate = fm.time_estimate != null ? String(fm.time_estimate) : "";
 			this.difficulty = fm.difficulty ?? "";
+			this.trigger = fm.trigger ?? "";
 		} else {
 			this.status = (options.defaultStatus as TaskStatus) ?? "inbox";
 			this.priority = (options.defaultPriority as TaskPriority) ?? "medium";
@@ -173,6 +176,26 @@ export class TaskModal extends Modal {
 		});
 		this.updateEstimationInsight();
 
+		const triggerSetting = new Setting(contentEl)
+			.setName("Implementation intention")
+			.setDesc("When will you start? e.g. \"after morning standup\", \"at 2pm\", \"after Deploy PR\"")
+			.addText((text) => {
+				text
+					.setPlaceholder("When X happens, I will start this task")
+					.setValue(this.trigger)
+					.onChange((v) => { this.trigger = v; });
+				this.triggerInputEl = text.inputEl;
+			});
+
+		if (this.options.taskParser) {
+			triggerSetting.addExtraButton((btn) =>
+				btn
+					.setIcon("sparkles")
+					.setTooltip("AI suggest")
+					.onClick(() => this.suggestTrigger()),
+			);
+		}
+
 		const notesWrapper = contentEl.createDiv({ cls: "arcana-task-notes-field" });
 		notesWrapper.createEl("label", {
 			text: "Notes",
@@ -242,6 +265,38 @@ export class TaskModal extends Modal {
 		}
 	}
 
+	private async suggestTrigger(): Promise<void> {
+		if (!this.options.taskParser || !this.triggerInputEl) return;
+		if (!this.title.trim()) {
+			new Notice("Enter a task title first.");
+			return;
+		}
+
+		this.triggerInputEl.setAttr("placeholder", "Thinking...");
+		try {
+			const suggestion = await this.options.taskParser.suggestTrigger(
+				this.title.trim(),
+				this.notes || undefined,
+				this.dueParsed ?? undefined,
+				this.scheduledParsed ?? undefined,
+			);
+			if (suggestion && !this.trigger.trim()) {
+				this.trigger = suggestion;
+				this.triggerInputEl.value = suggestion;
+			} else if (suggestion) {
+				new Notice(`Suggestion: ${suggestion}`);
+			} else {
+				new Notice("Could not generate a suggestion.");
+			}
+		} catch {
+			new Notice("Failed to get AI suggestion.");
+		}
+		this.triggerInputEl.setAttr(
+			"placeholder",
+			"When X happens, I will start this task",
+		);
+	}
+
 	private addDateField(
 		container: HTMLElement,
 		label: string,
@@ -272,12 +327,25 @@ export class TaskModal extends Modal {
 		}
 
 		if (this.options.taskParser) {
-			const suggested = await this.options.taskParser.suggestDifficulty(
-				this.title.trim(),
-				this.notes || undefined,
-			);
-			if (suggested) {
-				this.difficulty = suggested;
+			const [suggestedDiff, suggestedTrigger] = await Promise.all([
+				this.options.taskParser.suggestDifficulty(
+					this.title.trim(),
+					this.notes || undefined,
+				),
+				!this.trigger.trim()
+					? this.options.taskParser.suggestTrigger(
+						this.title.trim(),
+						this.notes || undefined,
+						this.dueParsed ?? undefined,
+						this.scheduledParsed ?? undefined,
+					)
+					: Promise.resolve(null),
+			]);
+			if (suggestedDiff) {
+				this.difficulty = suggestedDiff;
+			}
+			if (suggestedTrigger && !this.trigger.trim()) {
+				this.trigger = suggestedTrigger;
 			}
 		}
 
@@ -301,6 +369,7 @@ export class TaskModal extends Modal {
 			...(this.folder.trim() ? { context: this.folder.trim() } : {}),
 			...(Number.isFinite(est) && est > 0 ? { time_estimate: est } : {}),
 			...(this.difficulty ? { difficulty: this.difficulty as "easy" | "medium" | "hard" } : {}),
+			...(this.trigger.trim() ? { trigger: this.trigger.trim() } : {}),
 		};
 
 		try {

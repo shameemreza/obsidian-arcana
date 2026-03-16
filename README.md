@@ -113,6 +113,8 @@ AI builds a complete Obsidian note template with YAML frontmatter, headings, pla
 
 Starts a countdown in the chat. Uses your configured work duration by default, or pass a number to set custom minutes. Shows a live timer that updates every second. When time is up, fires an Obsidian Notice and a brief visual animation. The elapsed time is tracked per file so it can pre-fill the actual time prompt when you complete the task.
 
+External timers compensate for impaired time perception, a well-documented trait in ADHD. By making elapsed time visible and audible, the timer acts as a prosthetic sense of time, reducing the drift between "I'll just work for a bit" and three hours passing unnoticed.
+
 #### `/next` - Get your next task
 
 ```
@@ -120,6 +122,8 @@ Starts a countdown in the chat. Uses your configured work duration by default, o
 ```
 
 AI looks at all open tasks in your task folder, considers the time of day, your chronotype, due dates, and priorities, then picks exactly one task for you to work on right now. Not a list, not options. One task and one concrete first step to get started.
+
+Decision fatigue and choice overload are amplified in ADHD. When faced with a long task list, the brain stalls on choosing rather than doing. By reducing the decision to zero, `/next` removes the highest friction point in task initiation.
 
 #### `/worktogether` - Body-double session
 
@@ -169,6 +173,8 @@ Pulls together your day:
 3. Asks what went well and what your top priority is for tomorrow.
 
 Saves the review to your daily note, creating one if needed. Pairs with `/morning` for a full daily cycle.
+
+Structured reflection helps consolidate learning from the day and offload open loops before sleep. For ADHD minds that tend to ruminate on unfinished tasks, a deliberate end-of-day closure ritual reduces nighttime mental churn and improves next-day planning.
 
 ### Custom Commands (Agent Skills)
 
@@ -329,7 +335,7 @@ Statuses: `inbox`, `todo`, `doing`, `waiting`, `done`, `cancelled`.
 
 Priorities: `urgent`, `high`, `medium`, `low`, `none`.
 
-Difficulty: `easy`, `medium`, `hard`. When AI is configured, difficulty is auto-classified on task creation based on the title and notes. The AI overrides any manually selected value, so you always get an accurate assessment. Classification criteria: easy (quick, routine, under 15 min), medium (some thought, 15-60 min), hard (complex, research needed, over 60 min).
+Difficulty: `easy`, `medium`, `hard`. Research on the planning fallacy shows that people consistently underestimate complex tasks more than simple ones. Tagging difficulty lets the estimation training system weight its insights per difficulty tier, giving you more accurate corrections. When AI is configured, difficulty is auto-classified on task creation based on the title and notes. The AI overrides any manually selected value, so you always get an accurate assessment. Classification criteria: easy (quick, routine, under 15 min), medium (some thought, 15-60 min), hard (complex, research needed, over 60 min).
 
 Natural language input supports tags (`#work`), priority markers (`priority:high`, `!!!`, `ASAP`), and due dates (`by Friday`, `due next Monday`, `before March 15`, `in 3 days`).
 
@@ -339,17 +345,23 @@ The task creation modal has a **Folder** field that lets you choose a subfolder 
 
 #### Completion feedback
 
+The ADHD brain responds strongly to immediate, salient feedback. Delayed or invisible rewards often fail to register, which is why finishing a task can feel oddly empty. Visible completion cues provide instant positive reinforcement that helps sustain motivation across a series of tasks.
+
 Completing a task via the command palette shows a brief green checkmark animation as positive feedback, followed by the actual time prompt (if estimation training is enabled). The `/focus` timer also fires a visual animation and an Obsidian Notice when the session ends.
 
 #### Time estimates and estimation training
 
+Time blindness is one of the most consistent findings in ADHD research. People with ADHD tend to significantly underestimate how long tasks will take and have difficulty sensing the passage of time. This is not a motivation problem; it is a neurological difference in how the brain processes temporal information. The estimation training system is designed to build calibration over time through structured feedback, not pressure.
+
 Time estimates are stored with human-readable units: `10 min`, `1 hr`, `1 hr 30 min`, `1 day`. When you enter a number in the task modal, it is treated as minutes and formatted automatically. Legacy bare numbers (like `30`) are still read correctly.
 
-When **Time estimation training** is enabled in settings, completing a task prompts you for how long it actually took. If you used the `/focus` timer on that task, the elapsed time is pre-filled. Over time, Arcana builds a picture of your estimation accuracy and shows insights like "You usually underestimate by about 40%." when you enter an estimate on a new task.
+When **Time estimation training** is enabled in settings, completing a task prompts you for how long it actually took. If you used the `/focus` timer on that task, the elapsed time is pre-filled. Over time, Arcana builds a picture of your estimation accuracy and shows insights like "You usually underestimate by about 40%." when you enter an estimate on a new task. The goal is not to make you feel bad about wrong estimates. It is to help your brain learn the gap between "how long I think" and "how long it actually is," which research shows can improve with repeated, low-stakes feedback.
 
-With **Auto-adjust estimates** enabled, Arcana also shows an adjusted estimate alongside your original, calibrated to your historical accuracy. Insights can be broken down by difficulty level when enough data exists.
+With **Auto-adjust estimates** enabled, Arcana also shows an adjusted estimate alongside your original, calibrated to your historical accuracy. Insights can be broken down by difficulty level when enough data exists. This acts as an external time-awareness aid, compensating for the internal clock that ADHD makes unreliable.
 
 #### Task chunking and subtasks
+
+Large tasks are a common source of paralysis for people with ADHD. Executive function difficulties make it hard to know where to start, and the lack of visible progress starves the brain of dopamine feedback. Breaking tasks into smaller pieces creates frequent completion moments, each one a micro-win that reinforces momentum.
 
 Use the **Break down current task into subtasks** command (or `/breakdown` in chat) to split any task into smaller pieces. AI analyzes the task and creates concrete subtasks, each as its own note inside a subfolder:
 
